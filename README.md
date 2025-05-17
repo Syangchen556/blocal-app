@@ -1,36 +1,106 @@
-This is a [Next.js](https://nextjs.org) project bootstrapped with [`create-next-app`](https://github.com/vercel/next.js/tree/canary/packages/create-next-app).
+# Vegetable Store
+
+A Next.js-based online store for fresh vegetables and fruits with role-based authentication.
+
+## Features
+
+- Role-based authentication (Admin, Seller, Buyer)
+- Beautiful and responsive UI
+- Product catalog with categories
+- Shopping cart functionality
+- User dashboards based on roles
+
+## Demo Accounts
+
+```
+Admin:
+- Email: admin@example.com
+- Password: admin123
+
+Seller:
+- Email: seller@example.com
+- Password: seller123
+
+Buyer:
+- Email: buyer@example.com
+- Password: buyer123
+```
+
+## Prerequisites
+
+- Node.js 18.x or later
+- npm or yarn
 
 ## Getting Started
 
-First, run the development server:
+1. Clone the repository:
+```bash
+git clone <repository-url>
+cd vegetable-store
+```
 
+2. Install dependencies:
+```bash
+npm install
+# or
+yarn install
+```
+
+3. Run the development server:
 ```bash
 npm run dev
 # or
 yarn dev
-# or
-pnpm dev
-# or
-bun dev
 ```
 
-Open [http://localhost:3000](http://localhost:3000) with your browser to see the result.
+4. Open [http://localhost:3000](http://localhost:3000) with your browser to see the result.
 
-You can start editing the page by modifying `app/page.js`. The page auto-updates as you edit the file.
+## Project Structure
 
-This project uses [`next/font`](https://nextjs.org/docs/app/building-your-application/optimizing/fonts) to automatically optimize and load [Geist](https://vercel.com/font), a new font family for Vercel.
+```
+├── src/
+│   ├── app/                 # Next.js app directory
+│   │   ├── api/            # API routes
+│   │   ├── auth/           # Authentication pages
+│   │   ├── dashboard/      # Dashboard pages
+│   │   └── page.jsx        # Homepage
+│   ├── components/         # React components
+│   │   ├── home/          # Homepage components
+│   │   ├── layout/        # Layout components
+│   │   └── products/      # Product-related components
+│   └── styles/            # Global styles
+├── public/                # Static files
+└── package.json          # Project dependencies
+```
 
-## Learn More
+## Role-Based Features
 
-To learn more about Next.js, take a look at the following resources:
+### Admin
+- User management
+- Analytics dashboard
+- Product approval
+- Category management
 
-- [Next.js Documentation](https://nextjs.org/docs) - learn about Next.js features and API.
-- [Learn Next.js](https://nextjs.org/learn) - an interactive Next.js tutorial.
+### Seller
+- Product management
+- Order management
+- Sales analytics
+- Inventory management
 
-You can check out [the Next.js GitHub repository](https://github.com/vercel/next.js) - your feedback and contributions are welcome!
+### Buyer
+- Browse products
+- Shopping cart
+- Order history
+- Favorites list
 
-## Deploy on Vercel
+## Contributing
 
-The easiest way to deploy your Next.js app is to use the [Vercel Platform](https://vercel.com/new?utm_medium=default-template&filter=next.js&utm_source=create-next-app&utm_campaign=create-next-app-readme) from the creators of Next.js.
+1. Fork the repository
+2. Create your feature branch (`git checkout -b feature/amazing-feature`)
+3. Commit your changes (`git commit -m 'Add some amazing feature'`)
+4. Push to the branch (`git push origin feature/amazing-feature`)
+5. Open a Pull Request
 
-Check out our [Next.js deployment documentation](https://nextjs.org/docs/app/building-your-application/deploying) for more details.
+## License
+
+This project is licensed under the MIT License - see the LICENSE file for details.
