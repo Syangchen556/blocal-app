@@ -1,4 +1,5 @@
 import mongoose from 'mongoose';
+import { autoGenerateSlug } from '@/utils/slugify';
 
 const commentSchema = new mongoose.Schema({
   author: {
@@ -27,6 +28,7 @@ const BlogSchema = new mongoose.Schema({
   slug: {
     type: String,
     unique: true,
+    sparse: true,
     lowercase: true
   },
   content: {
@@ -41,8 +43,7 @@ const BlogSchema = new mongoose.Schema({
   author: {
     type: mongoose.Schema.Types.ObjectId,
     ref: 'User',
-    required: [true, 'Please provide an author'],
-    index: true
+    required: [true, 'Please provide an author']
   },
   media: {
     featuredImage: {
@@ -87,31 +88,29 @@ const BlogSchema = new mongoose.Schema({
     metaTitle: String,
     metaDescription: String,
     keywords: [String]
-  }
+  },
+  coverImage: {
+    type: String
+  },
+  likes: [{
+    type: mongoose.Schema.Types.ObjectId,
+    ref: 'User'
+  }]
 }, {
   timestamps: true,
   toJSON: { virtuals: true },
   toObject: { virtuals: true }
 });
 
-// Add indexes for better query performance
-BlogSchema.index({ title: 1 });
-BlogSchema.index({ category: 1 });
-BlogSchema.index({ status: 1 });
-BlogSchema.index({ tags: 1 });
-BlogSchema.index({ 'metadata.views': -1 });
+// Add compound indexes for better query performance
+BlogSchema.index({ title: 'text', content: 'text' }); // Text search index
+BlogSchema.index({ category: 1, status: 1 }); // For filtering by category and status
+BlogSchema.index({ author: 1, createdAt: -1 }); // For author's blog listing
+BlogSchema.index({ 'metadata.views': -1 }); // For popular blogs
+BlogSchema.index({ tags: 1 }); // For tag-based queries
 
-// Pre-save hook to generate slug
-BlogSchema.pre('save', function(next) {
-  if (!this.isModified('title')) {
-    return next();
-  }
-  this.slug = this.title
-    .toLowerCase()
-    .replace(/[^a-z0-9]+/g, '-')
-    .replace(/(^-|-$)+/g, '');
-  next();
-});
+// Auto-generate slug from title
+BlogSchema.pre('save', autoGenerateSlug('title'));
 
 // Virtual for comment count
 BlogSchema.virtual('commentCount').get(function() {
@@ -123,4 +122,7 @@ BlogSchema.methods.isPublished = function() {
   return this.status === 'PUBLISHED';
 };
 
-export default mongoose.models.Blog || mongoose.model('Blog', BlogSchema); 
+// Prevent duplicate model initialization
+const Blog = mongoose.models.Blog || mongoose.model('Blog', BlogSchema);
+
+export default Blog; 

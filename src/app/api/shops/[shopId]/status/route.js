@@ -22,7 +22,18 @@ export async function PATCH(request, { params }) {
 
     const shop = await Shop.findByIdAndUpdate(
       shopId,
-      { isActive },
+      { 
+        isActive,
+        statusHistory: [
+          ...shop.statusHistory,
+          {
+            status: isActive ? 'active' : 'inactive',
+            timestamp: new Date(),
+            message: `Shop ${isActive ? 'activated' : 'deactivated'} by admin`,
+            updatedBy: session.user.id
+          }
+        ]
+      },
       { new: true }
     );
 

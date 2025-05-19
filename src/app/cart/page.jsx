@@ -5,89 +5,106 @@ import { useSession } from 'next-auth/react';
 import { useRouter } from 'next/navigation';
 import Image from 'next/image';
 import { FaTrash, FaMinus, FaPlus } from 'react-icons/fa';
+import toast from 'react-hot-toast';
 import LoadingSpinner from '@/components/ui/LoadingSpinner';
-import Button from '@/components/ui/Button';
+import ConfirmDialog from '@/components/ui/ConfirmDialog';
 
 export default function Cart() {
   const { data: session } = useSession();
   const router = useRouter();
-  const [loading, setLoading] = useState(true);
-  const [cart, setCart] = useState(null);
+  const [cart, setCart] = useState([]);
+  const [isLoading, setIsLoading] = useState(true);
+  const [showConfirm, setShowConfirm] = useState(false);
+  const [confirmAction, setConfirmAction] = useState(null);
 
   useEffect(() => {
     if (!session) {
-      router.push('/auth/signin');
+      router.push('/login');
       return;
     }
-
-    if (session.user.role === 'SELLER') {
-      router.push('/dashboard/seller');
-      return;
-    }
-
     fetchCart();
   }, [session, router]);
 
   const fetchCart = async () => {
     try {
       const response = await fetch('/api/cart');
-      if (response.ok) {
-        const data = await response.json();
-        setCart(data);
-      }
+      if (!response.ok) throw new Error('Failed to fetch cart');
+      const data = await response.json();
+      setCart(data.items);
     } catch (error) {
       console.error('Error fetching cart:', error);
+      toast.error('Failed to load cart');
     } finally {
-      setLoading(false);
+      setIsLoading(false);
     }
   };
 
-  const updateQuantity = async (productId, quantity) => {
+  const handleQuantityChange = async (productId, change) => {
     try {
-      const response = await fetch('/api/cart', {
-        method: 'POST',
+      const response = await fetch('/api/cart/update', {
+        method: 'PUT',
         headers: {
           'Content-Type': 'application/json',
         },
-        body: JSON.stringify({ productId, quantity }),
+        body: JSON.stringify({
+          productId,
+          quantity: change === 'increment' ? 1 : -1,
+        }),
       });
 
-      if (response.ok) {
-        const data = await response.json();
-        setCart(data);
-      }
+      if (!response.ok) throw new Error('Failed to update quantity');
+      fetchCart();
     } catch (error) {
-      console.error('Error updating cart:', error);
+      console.error('Error updating quantity:', error);
+      toast.error('Failed to update quantity');
     }
   };
 
-  const removeItem = async (productId) => {
-    try {
-      const response = await fetch('/api/cart', {
-        method: 'DELETE',
-        headers: {
-          'Content-Type': 'application/json',
-        },
-        body: JSON.stringify({ productId }),
-      });
+  const handleRemoveItem = async (productId) => {
+    setConfirmAction(() => async () => {
+      try {
+        const response = await fetch(`/api/cart/remove/${productId}`, {
+          method: 'DELETE',
+        });
 
-      if (response.ok) {
-        const data = await response.json();
-        setCart(data);
+        if (!response.ok) throw new Error('Failed to remove item');
+        toast.success('Item removed from cart');
+        fetchCart();
+      } catch (error) {
+        console.error('Error removing item:', error);
+        toast.error('Failed to remove item');
       }
-    } catch (error) {
-      console.error('Error removing item:', error);
+    });
+    setShowConfirm(true);
+  };
+
+  const handleClearCart = () => {
+    setConfirmAction(() => async () => {
+      try {
+        const response = await fetch('/api/cart/clear', {
+          method: 'DELETE',
+        });
+
+        if (!response.ok) throw new Error('Failed to clear cart');
+        toast.success('Cart cleared');
+        fetchCart();
+      } catch (error) {
+        console.error('Error clearing cart:', error);
+        toast.error('Failed to clear cart');
+      }
+    });
+    setShowConfirm(true);
+  };
+
+  const handleConfirm = async () => {
+    if (confirmAction) {
+      await confirmAction();
+      setShowConfirm(false);
+      setConfirmAction(null);
     }
   };
 
-  const calculateTotal = () => {
-    if (!cart?.items?.length) return 0;
-    return cart.items.reduce((total, item) => {
-      return total + (item.product.price * item.quantity);
-    }, 0);
-  };
-
-  if (loading) {
+  if (isLoading) {
     return (
       <div className="min-h-screen flex items-center justify-center">
         <LoadingSpinner size="lg" />
@@ -95,125 +112,116 @@ export default function Cart() {
     );
   }
 
+  const total = cart.reduce((sum, item) => sum + item.product.price * item.quantity, 0);
+
   return (
-    <div className="min-h-screen bg-gray-50 py-8">
-      <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
-        <h1 className="text-2xl font-bold text-gray-900 mb-8">Shopping Cart</h1>
+    <div className="max-w-7xl mx-auto px-4 py-8">
+      <div className="flex justify-between items-center mb-8">
+        <h1 className="text-3xl font-bold text-gray-900">Shopping Cart</h1>
+        {cart.length > 0 && (
+          <button
+            onClick={handleClearCart}
+            className="flex items-center space-x-2 px-4 py-2 text-red-600 hover:text-red-700"
+          >
+            <FaTrash />
+            <span>Clear Cart</span>
+          </button>
+        )}
+      </div>
 
-        {!cart?.items?.length ? (
-          <div className="bg-white rounded-lg shadow-md p-6 text-center">
-            <p className="text-gray-500 mb-4">Your cart is empty</p>
-            <Button
-              variant="primary"
-              onClick={() => router.push('/')}
-            >
-              Continue Shopping
-            </Button>
-          </div>
-        ) : (
-          <div className="bg-white rounded-lg shadow-md overflow-hidden">
-            <table className="min-w-full divide-y divide-gray-200">
-              <thead className="bg-gray-50">
-                <tr>
-                  <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                    Product
-                  </th>
-                  <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                    Price
-                  </th>
-                  <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                    Quantity
-                  </th>
-                  <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                    Total
-                  </th>
-                  <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                    Actions
-                  </th>
-                </tr>
-              </thead>
-              <tbody className="bg-white divide-y divide-gray-200">
-                {cart.items.map((item) => (
-                  <tr key={item.product._id}>
-                    <td className="px-6 py-4 whitespace-nowrap">
-                      <div className="flex items-center">
-                        <div className="h-16 w-16 relative flex-shrink-0">
-                          <Image
-                            src={item.product.imageUrl}
-                            alt={item.product.name}
-                            fill
-                            className="object-cover rounded-md"
-                          />
-                        </div>
-                        <div className="ml-4">
-                          <div className="text-sm font-medium text-gray-900">
-                            {item.product.name}
-                          </div>
-                        </div>
-                      </div>
-                    </td>
-                    <td className="px-6 py-4 whitespace-nowrap">
-                      <div className="text-sm text-gray-900">Nu. {item.product.price}</div>
-                    </td>
-                    <td className="px-6 py-4 whitespace-nowrap">
-                      <div className="flex items-center space-x-2">
-                        <button
-                          onClick={() => updateQuantity(item.product._id, Math.max(1, item.quantity - 1))}
-                          className="p-1 rounded-md hover:bg-gray-100"
-                        >
-                          <FaMinus className="text-gray-500" />
-                        </button>
-                        <span className="text-sm text-gray-900">{item.quantity}</span>
-                        <button
-                          onClick={() => updateQuantity(item.product._id, item.quantity + 1)}
-                          className="p-1 rounded-md hover:bg-gray-100"
-                        >
-                          <FaPlus className="text-gray-500" />
-                        </button>
-                      </div>
-                    </td>
-                    <td className="px-6 py-4 whitespace-nowrap">
-                      <div className="text-sm text-gray-900">
-                        Nu. {item.product.price * item.quantity}
-                      </div>
-                    </td>
-                    <td className="px-6 py-4 whitespace-nowrap">
+      {cart.length === 0 ? (
+        <div className="text-center py-12">
+          <p className="text-xl text-gray-600">Your cart is empty</p>
+        </div>
+      ) : (
+        <div className="grid grid-cols-1 lg:grid-cols-3 gap-8">
+          <div className="lg:col-span-2">
+            <div className="bg-white rounded-lg shadow overflow-hidden">
+              {cart.map((item) => (
+                <div
+                  key={item.product._id}
+                  className="flex items-center p-4 border-b last:border-b-0"
+                >
+                  <div className="relative h-24 w-24 flex-shrink-0">
+                    <Image
+                      src={item.product.images[0]}
+                      alt={item.product.name}
+                      fill
+                      className="object-cover rounded"
+                    />
+                  </div>
+                  <div className="ml-4 flex-grow">
+                    <h3 className="text-lg font-medium text-gray-900">
+                      {item.product.name}
+                    </h3>
+                    <p className="text-gray-600">Nu. {item.product.price.toFixed(2)}</p>
+                  </div>
+                  <div className="flex items-center space-x-4">
+                    <div className="flex items-center space-x-2">
                       <button
-                        onClick={() => removeItem(item.product._id)}
-                        className="text-red-600 hover:text-red-900"
+                        onClick={() => handleQuantityChange(item.product._id, 'decrement')}
+                        disabled={item.quantity <= 1}
+                        className="p-1 rounded-full hover:bg-gray-100 disabled:opacity-50"
                       >
-                        <FaTrash />
+                        <FaMinus className="w-4 h-4" />
                       </button>
-                    </td>
-                  </tr>
-                ))}
-              </tbody>
-            </table>
+                      <span className="w-8 text-center">{item.quantity}</span>
+                      <button
+                        onClick={() => handleQuantityChange(item.product._id, 'increment')}
+                        className="p-1 rounded-full hover:bg-gray-100"
+                      >
+                        <FaPlus className="w-4 h-4" />
+                      </button>
+                    </div>
+                    <button
+                      onClick={() => handleRemoveItem(item.product._id)}
+                      className="text-red-600 hover:text-red-700"
+                    >
+                      <FaTrash />
+                    </button>
+                  </div>
+                </div>
+              ))}
+            </div>
+          </div>
 
-            <div className="px-6 py-4 bg-gray-50">
-              <div className="flex justify-between items-center">
-                <div className="text-lg font-semibold text-gray-900">
-                  Total: Nu. {calculateTotal()}
+          <div className="lg:col-span-1">
+            <div className="bg-white rounded-lg shadow p-6">
+              <h2 className="text-lg font-medium text-gray-900 mb-4">Order Summary</h2>
+              <div className="space-y-4">
+                <div className="flex justify-between">
+                  <span>Subtotal</span>
+                  <span>Nu. {total.toFixed(2)}</span>
                 </div>
-                <div className="space-x-4">
-                  <Button
-                    variant="secondary"
-                    onClick={() => router.push('/')}
-                  >
-                    Continue Shopping
-                  </Button>
-                  <Button
-                    variant="primary"
-                    onClick={() => router.push('/checkout')}
-                  >
-                    Checkout
-                  </Button>
+                <div className="flex justify-between">
+                  <span>Shipping</span>
+                  <span>Calculated at checkout</span>
                 </div>
+                <div className="border-t pt-4">
+                  <div className="flex justify-between font-medium">
+                    <span>Total</span>
+                    <span>Nu. {total.toFixed(2)}</span>
+                  </div>
+                </div>
+                <button
+                  onClick={() => router.push('/checkout')}
+                  className="w-full bg-green-600 text-white py-2 px-4 rounded-md hover:bg-green-700 focus:outline-none focus:ring-2 focus:ring-green-500 focus:ring-offset-2"
+                >
+                  Proceed to Checkout
+                </button>
               </div>
             </div>
           </div>
-        )}
-      </div>
+        </div>
+      )}
+
+      <ConfirmDialog
+        isOpen={showConfirm}
+        onClose={() => setShowConfirm(false)}
+        onConfirm={handleConfirm}
+        title="Confirm Action"
+        message="Are you sure you want to proceed with this action? This cannot be undone."
+      />
     </div>
   );
 } 

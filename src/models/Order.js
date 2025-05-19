@@ -4,14 +4,12 @@ const orderItemSchema = new mongoose.Schema({
   product: {
     type: mongoose.Schema.Types.ObjectId,
     ref: 'Product',
-    required: true,
-    index: true
+    required: true
   },
   shop: {
     type: mongoose.Schema.Types.ObjectId,
     ref: 'Shop',
-    required: true,
-    index: true
+    required: true
   },
   quantity: {
     type: Number,
@@ -21,13 +19,11 @@ const orderItemSchema = new mongoose.Schema({
   price: {
     type: Number,
     required: true,
-    min: [0, 'Price cannot be negative'],
-    comment: 'Price at the time of order'
+    min: [0, 'Price cannot be negative']
   },
-  subtotal: {
-    type: Number,
-    required: true,
-    min: [0, 'Subtotal cannot be negative']
+  variety: {
+    name: String,
+    sku: String
   }
 });
 
@@ -35,21 +31,24 @@ const orderSchema = new mongoose.Schema({
   orderNumber: {
     type: String,
     required: true,
-    unique: true,
-    index: true
+    unique: true
   },
   user: {
     type: mongoose.Schema.Types.ObjectId,
     ref: 'User',
-    required: [true, 'Order must belong to a user'],
-    index: true
+    required: true
   },
   items: [orderItemSchema],
+  status: {
+    type: String,
+    enum: ['PENDING', 'PROCESSING', 'SHIPPED', 'DELIVERED', 'CANCELLED'],
+    default: 'PENDING'
+  },
   payment: {
     method: {
       type: String,
-      required: true,
-      enum: ['CASH', 'CARD', 'MOBILE_MONEY']
+      enum: ['CASH', 'CARD', 'MOBILE_MONEY'],
+      required: true
     },
     status: {
       type: String,
@@ -57,52 +56,8 @@ const orderSchema = new mongoose.Schema({
       default: 'PENDING'
     },
     transactionId: String,
-    paidAt: Date,
-    refundedAt: Date
+    paidAt: Date
   },
-  pricing: {
-    subtotal: {
-      type: Number,
-      required: true,
-      min: 0
-    },
-    tax: {
-      type: Number,
-      required: true,
-      min: 0
-    },
-    shippingCost: {
-      type: Number,
-      required: true,
-      min: 0
-    },
-    discount: {
-      type: Number,
-      default: 0,
-      min: 0
-    },
-    total: {
-      type: Number,
-      required: true,
-      min: 0
-    }
-  },
-  status: {
-    type: String,
-    enum: ['PENDING', 'PROCESSING', 'SHIPPED', 'DELIVERED', 'CANCELLED'],
-    default: 'PENDING'
-  },
-  statusHistory: [{
-    status: {
-      type: String,
-      enum: ['PENDING', 'PROCESSING', 'SHIPPED', 'DELIVERED', 'CANCELLED']
-    },
-    timestamp: {
-      type: Date,
-      default: Date.now
-    },
-    note: String
-  }],
   shipping: {
     address: {
       street: {
@@ -123,41 +78,51 @@ const orderSchema = new mongoose.Schema({
       },
       country: {
         type: String,
-        required: true,
-        default: 'Bhutan'
+        required: true
       }
     },
-    carrier: String,
-    trackingNumber: String,
-    estimatedDelivery: Date,
-    deliveredAt: Date
-  },
-  notes: {
-    customer: String,
-    internal: String
-  },
-  metadata: {
-    source: {
-      type: String,
-      enum: ['WEB', 'MOBILE', 'POS'],
-      default: 'WEB'
+    cost: {
+      type: Number,
+      required: true,
+      min: 0
     },
-    userAgent: String,
-    ipAddress: String
-  }
+    method: {
+      type: String,
+      enum: ['STANDARD', 'EXPRESS'],
+      default: 'STANDARD'
+    },
+    trackingNumber: String,
+    estimatedDelivery: Date
+  },
+  pricing: {
+    subtotal: {
+      type: Number,
+      required: true,
+      min: 0
+    },
+    tax: {
+      type: Number,
+      required: true,
+      min: 0
+    },
+    discount: {
+      type: Number,
+      default: 0,
+      min: 0
+    },
+    total: {
+      type: Number,
+      required: true,
+      min: 0
+    }
+  },
+  notes: String,
+  cancelReason: String
 }, {
-  timestamps: true,
-  toJSON: { virtuals: true },
-  toObject: { virtuals: true }
+  timestamps: true
 });
 
-// Indexes for better query performance
-orderSchema.index({ 'payment.status': 1 });
-orderSchema.index({ status: 1 });
-orderSchema.index({ createdAt: -1 });
-orderSchema.index({ 'shipping.trackingNumber': 1 });
-
-// Pre-save middleware to generate order number
+// Generate order number
 orderSchema.pre('save', async function(next) {
   if (this.isNew) {
     const date = new Date();
@@ -169,19 +134,36 @@ orderSchema.pre('save', async function(next) {
   next();
 });
 
-// Virtual for order age
-orderSchema.virtual('age').get(function() {
-  return Math.floor((Date.now() - this.createdAt) / (1000 * 60 * 60 * 24));
-});
-
-// Method to check if order can be cancelled
-orderSchema.methods.canBeCancelled = function() {
-  return ['PENDING', 'PROCESSING'].includes(this.status);
+// Method to calculate total
+orderSchema.methods.calculateTotal = function() {
+  const subtotal = this.items.reduce((total, item) => total + (item.price * item.quantity), 0);
+  const tax = subtotal * 0.13; // 13% tax
+  const total = subtotal + tax + this.shipping.cost - this.pricing.discount;
+  
+  this.pricing.subtotal = subtotal;
+  this.pricing.tax = tax;
+  this.pricing.total = total;
+  
+  return total;
 };
 
-// Method to check if order is complete
-orderSchema.methods.isComplete = function() {
-  return this.status === 'DELIVERED' && this.payment.status === 'PAID';
+// Method to cancel order
+orderSchema.methods.cancel = async function(reason) {
+  if (this.status === 'DELIVERED') {
+    throw new Error('Cannot cancel a delivered order');
+  }
+  
+  this.status = 'CANCELLED';
+  this.cancelReason = reason;
+  await this.save();
+  
+  // Update product stock
+  for (const item of this.items) {
+    const product = await mongoose.models.Product.findById(item.product);
+    if (product) {
+      await product.updateStock(item.quantity, 'increase');
+    }
+  }
 };
 
 const Order = mongoose.models.Order || mongoose.model('Order', orderSchema);

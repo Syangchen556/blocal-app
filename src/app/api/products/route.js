@@ -3,8 +3,6 @@ import { getServerSession } from 'next-auth/next';
 import connectDB from '@/lib/mongodb';
 import Product from '@/models/Product';
 import Shop from '@/models/Shop';
-import { writeFile } from 'fs/promises';
-import path from 'path';
 
 // Get all products
 export async function GET(req) {
@@ -13,39 +11,38 @@ export async function GET(req) {
     
     const { searchParams } = new URL(req.url);
     const query = searchParams.get('query') || '';
-    const seller = searchParams.get('seller') || '';
     const category = searchParams.get('category') || '';
-    const status = searchParams.get('status') || '';
+    const shop = searchParams.get('shop') || '';
+    const status = searchParams.get('status') || 'active';
 
-    let filter = {};
+    let filter = { status };
+    
     if (query) {
-      filter = {
-        $or: [
-          { name: { $regex: query, $options: 'i' } },
-          { description: { $regex: query, $options: 'i' } },
-        ],
-      };
+      filter.$or = [
+        { name: { $regex: query, $options: 'i' } },
+        { 'description.short': { $regex: query, $options: 'i' } },
+        { 'description.full': { $regex: query, $options: 'i' } }
+      ];
     }
-    if (seller) {
-      filter.seller = seller;
-    }
+    
     if (category) {
-      filter.category = category;
+      filter['category.main'] = category.toUpperCase();
     }
-    if (status) {
-      filter.status = status;
+    
+    if (shop) {
+      filter.shop = shop;
     }
 
     const products = await Product.find(filter)
-      .populate('seller', 'name email')
-      .populate('shop', 'name')
-      .sort({ createdAt: -1 });
+      .populate('seller', 'name email image')
+      .populate('shop', 'name logo')
+      .sort({ 'analytics.views': -1 });
 
     return NextResponse.json(products);
   } catch (error) {
     console.error('Error fetching products:', error);
     return NextResponse.json(
-      { error: 'Error fetching products' },
+      { error: 'Failed to fetch products' },
       { status: 500 }
     );
   }
@@ -62,26 +59,16 @@ export async function POST(req) {
       );
     }
 
-    if (session.user.role !== 'SELLER') {
-      return NextResponse.json(
-        { error: 'Only sellers can create products' },
-        { status: 403 }
-      );
-    }
-
     await connectDB();
+    const data = await req.json();
     
-    const formData = await req.formData();
-    const name = formData.get('name');
-    const description = formData.get('description');
-    const price = formData.get('price');
-    const category = formData.get('category');
-    const stock = formData.get('stock');
-    const image = formData.get('image');
-    const shopId = formData.get('shopId');
-
     // Validate shop ownership
-    const shop = await Shop.findOne({ _id: shopId, owner: session.user.id });
+    const shop = await Shop.findOne({ 
+      _id: data.shop, 
+      owner: session.user.id,
+      status: 'APPROVED'
+    });
+    
     if (!shop) {
       return NextResponse.json(
         { error: 'Shop not found or unauthorized' },
@@ -89,38 +76,29 @@ export async function POST(req) {
       );
     }
 
-    // Handle image upload
-    let imageUrl = '';
-    if (image) {
-      const bytes = await image.arrayBuffer();
-      const buffer = Buffer.from(bytes);
-      
-      // Create unique filename
-      const timestamp = Date.now();
-      const filename = `${timestamp}-${image.name}`;
-      const imagePath = path.join(process.cwd(), 'public', 'images', 'products', category, filename);
-      
-      await writeFile(imagePath, buffer);
-      imageUrl = `/images/products/${category}/${filename}`;
-    }
-
+    // Create product with proper schema
     const product = await Product.create({
-      name,
-      description,
-      price: parseFloat(price),
-      category,
-      stock: parseInt(stock),
-      imageUrl,
+      ...data,
       seller: session.user.id,
-      shop: shopId,
-      status: 'pending'
+      status: 'active',
+      analytics: {
+        views: 0,
+        sales: {
+          total: 0,
+          lastMonth: 0
+        },
+        conversion: 0
+      }
     });
+
+    await product.populate('seller', 'name email image');
+    await product.populate('shop', 'name logo');
 
     return NextResponse.json(product);
   } catch (error) {
     console.error('Error creating product:', error);
     return NextResponse.json(
-      { error: 'Error creating product' },
+      { error: 'Failed to create product' },
       { status: 500 }
     );
   }
@@ -141,7 +119,7 @@ export async function PUT(req) {
     const data = await req.json();
     const { id, ...updateData } = data;
 
-    let product = await Product.findById(id);
+    const product = await Product.findById(id);
     if (!product) {
       return NextResponse.json(
         { error: 'Product not found' },
@@ -149,33 +127,34 @@ export async function PUT(req) {
       );
     }
 
-    // Only allow sellers to update their own products
+    // Check authorization
     if (
-      session.user.role === 'SELLER' &&
+      session.user.role !== 'ADMIN' && 
       product.seller.toString() !== session.user.id
     ) {
       return NextResponse.json(
-        { error: 'You can only update your own products' },
+        { error: 'Not authorized to update this product' },
         { status: 403 }
       );
     }
 
-    // Only allow admins to update status
-    if (session.user.role !== 'ADMIN') {
-      delete updateData.status;
-    }
-
-    product = await Product.findByIdAndUpdate(
+    // Update product
+    const updatedProduct = await Product.findByIdAndUpdate(
       id,
-      { ...updateData, updatedAt: new Date() },
+      {
+        ...updateData,
+        updatedAt: new Date()
+      },
       { new: true }
-    ).populate('seller', 'name email');
+    )
+    .populate('seller', 'name email image')
+    .populate('shop', 'name logo');
 
-    return NextResponse.json(product);
+    return NextResponse.json(updatedProduct);
   } catch (error) {
     console.error('Error updating product:', error);
     return NextResponse.json(
-      { error: 'Error updating product' },
+      { error: 'Failed to update product' },
       { status: 500 }
     );
   }
@@ -204,13 +183,13 @@ export async function DELETE(req) {
       );
     }
 
-    // Only allow sellers to delete their own products or admins to delete any product
+    // Check authorization
     if (
-      session.user.role === 'SELLER' &&
+      session.user.role !== 'ADMIN' && 
       product.seller.toString() !== session.user.id
     ) {
       return NextResponse.json(
-        { error: 'You can only delete your own products' },
+        { error: 'Not authorized to delete this product' },
         { status: 403 }
       );
     }
@@ -221,7 +200,7 @@ export async function DELETE(req) {
   } catch (error) {
     console.error('Error deleting product:', error);
     return NextResponse.json(
-      { error: 'Error deleting product' },
+      { error: 'Failed to delete product' },
       { status: 500 }
     );
   }

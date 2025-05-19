@@ -1,34 +1,33 @@
-# Vegetable Store
+# BLocal - Local Marketplace
 
-A Next.js-based online store for fresh vegetables and fruits with role-based authentication.
+A Next.js-based online marketplace for local products with role-based authentication and MongoDB Atlas integration.
 
 ## Features
 
 - Role-based authentication (Admin, Seller, Buyer)
-- Beautiful and responsive UI
-- Product catalog with categories
-- Shopping cart functionality
-- User dashboards based on roles
+- MongoDB Atlas integration for cloud database
+- Beautiful and responsive UI with Tailwind CSS
+- Product catalog with categories and search
+- Shopping cart with animations
+- Wishlist functionality
+- Blog system with user-generated content
+- Shop profiles and analytics
+- Real-time product reviews and ratings
+- Bhutanese Ngultrum (Nu.) currency support
 
-## Demo Accounts
+## Tech Stack
 
-```
-Admin:
-- Email: admin@example.com
-- Password: admin123
-
-Seller:
-- Email: seller@example.com
-- Password: seller123
-
-Buyer:
-- Email: buyer@example.com
-- Password: buyer123
-```
+- Next.js 14
+- MongoDB Atlas
+- NextAuth.js for authentication
+- Tailwind CSS for styling
+- React Icons
+- React Hot Toast for notifications
 
 ## Prerequisites
 
 - Node.js 18.x or later
+- MongoDB Atlas account
 - npm or yarn
 
 ## Getting Started
@@ -36,24 +35,27 @@ Buyer:
 1. Clone the repository:
 ```bash
 git clone <repository-url>
-cd vegetable-store
+cd blocal-app
 ```
 
 2. Install dependencies:
 ```bash
 npm install
-# or
-yarn install
 ```
 
-3. Run the development server:
+3. Create a `.env.local` file in the root directory with the following variables:
+```env
+MONGODB_URI=your_mongodb_atlas_connection_string
+NEXTAUTH_SECRET=your_nextauth_secret
+NEXTAUTH_URL=http://localhost:3000
+```
+
+4. Run the development server:
 ```bash
 npm run dev
-# or
-yarn dev
 ```
 
-4. Open [http://localhost:3000](http://localhost:3000) with your browser to see the result.
+5. Open [http://localhost:3000](http://localhost:3000) with your browser to see the result.
 
 ## Project Structure
 
@@ -62,36 +64,63 @@ yarn dev
 │   ├── app/                 # Next.js app directory
 │   │   ├── api/            # API routes
 │   │   ├── auth/           # Authentication pages
-│   │   ├── dashboard/      # Dashboard pages
-│   │   └── page.jsx        # Homepage
+│   │   ├── blog/           # Blog pages
+│   │   ├── cart/           # Shopping cart
+│   │   ├── dashboard/      # User dashboards
+│   │   ├── products/       # Product pages
+│   │   ├── shops/          # Shop pages
+│   │   └── wishlist/       # Wishlist pages
 │   ├── components/         # React components
-│   │   ├── home/          # Homepage components
-│   │   ├── layout/        # Layout components
-│   │   └── products/      # Product-related components
-│   └── styles/            # Global styles
+│   │   ├── ui/            # UI components
+│   │   ├── products/      # Product components
+│   │   └── layout/        # Layout components
+│   ├── lib/               # Utility functions
+│   └── models/            # MongoDB models
 ├── public/                # Static files
 └── package.json          # Project dependencies
 ```
 
-## Role-Based Features
+## Features by Role
 
 ### Admin
-- User management
+- User and shop management
+- Product approval system
 - Analytics dashboard
-- Product approval
-- Category management
+- Blog moderation
 
 ### Seller
-- Product management
-- Order management
+- Shop profile management
+- Product management (CRUD)
 - Sales analytics
-- Inventory management
+- Shop statistics
+- Blog creation
 
 ### Buyer
-- Browse products
-- Shopping cart
-- Order history
-- Favorites list
+- Browse and search products
+- Shopping cart with animations
+- Wishlist management
+- Product reviews
+- Blog creation and interaction
+- Shop browsing
+
+## API Routes
+
+- `/api/auth/*` - Authentication endpoints
+- `/api/products/*` - Product management
+- `/api/shops/*` - Shop management
+- `/api/cart/*` - Shopping cart operations
+- `/api/wishlist/*` - Wishlist operations
+- `/api/blogs/*` - Blog management
+- `/api/upload/*` - File upload handling
+
+## Models
+
+- User - User information and authentication
+- Shop - Shop profiles and management
+- Product - Product listings and details
+- Blog - Blog posts and interactions
+- Cart - Shopping cart data
+- Wishlist - User wishlist items
 
 ## Contributing
 
