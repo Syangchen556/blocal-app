@@ -1,4 +1,6 @@
 import mongoose from 'mongoose';
+import { autoGenerateSlug } from '../utils/slugGenerator.js';
+import { generateUniqueSlug } from '../utils/slugGenerator.js';
 
 const varietySchema = new mongoose.Schema({
   name: {
@@ -96,19 +98,24 @@ const productSchema = new mongoose.Schema({
     type: String,
     required: [true, 'Product name is required'],
     trim: true,
-    maxLength: [200, 'Product name cannot exceed 200 characters']
+    maxlength: [200, 'Product name cannot exceed 200 characters']
   },
   slug: {
     type: String,
     unique: true,
+<<<<<<< HEAD
     lowercase: true,
     index: true
+=======
+    sparse: true,
+    lowercase: true
+>>>>>>> ce08c47481366906128db17c6bd3eaf53dc5d6a3
   },
   description: {
     short: {
       type: String,
       required: [true, 'Short description is required'],
-      maxLength: [300, 'Short description cannot exceed 300 characters']
+      maxlength: [300, 'Short description cannot exceed 300 characters']
     },
     full: {
       type: String,
@@ -118,23 +125,9 @@ const productSchema = new mongoose.Schema({
   media: {
     mainImage: {
       type: String,
-      required: [true, 'Main product image is required'],
-      validate: {
-        validator: function(v) {
-          return /^https?:\/\/.+\.(jpg|jpeg|png|gif|webp)$/i.test(v);
-        },
-        message: 'Invalid main image URL format'
-      }
+      required: [true, 'Main product image is required']
     },
-    gallery: [{
-      type: String,
-      validate: {
-        validator: function(v) {
-          return /^https?:\/\/.+\.(jpg|jpeg|png|gif|webp)$/i.test(v);
-        },
-        message: 'Invalid gallery image URL format'
-      }
-    }]
+    gallery: [String]
   },
   pricing: {
     base: {
@@ -150,7 +143,7 @@ const productSchema = new mongoose.Schema({
     },
     currency: {
       type: String,
-      default: 'BTN'
+      default: 'Nu.'
     }
   },
   inventory: {
@@ -187,14 +180,12 @@ const productSchema = new mongoose.Schema({
   seller: {
     type: mongoose.Schema.Types.ObjectId,
     ref: 'User',
-    required: true,
-    index: true
+    required: true
   },
   shop: {
     type: mongoose.Schema.Types.ObjectId,
     ref: 'Shop',
-    required: true,
-    index: true
+    required: true
   },
   status: {
     type: String,
@@ -203,7 +194,28 @@ const productSchema = new mongoose.Schema({
   },
   varieties: [varietySchema],
   specifications: [specificationSchema],
-  reviews: [reviewSchema],
+  reviews: [{
+    user: {
+      type: mongoose.Schema.Types.ObjectId,
+      ref: 'User',
+      required: true
+    },
+    rating: {
+      type: Number,
+      required: true,
+      min: 1,
+      max: 5
+    },
+    comment: {
+      type: String,
+      required: true,
+      maxlength: [500, 'Review cannot exceed 500 characters']
+    },
+    createdAt: {
+      type: Date,
+      default: Date.now
+    }
+  }],
   rating: {
     average: {
       type: Number,
@@ -246,7 +258,14 @@ const productSchema = new mongoose.Schema({
     issuer: String,
     validUntil: Date,
     documentUrl: String
-  }]
+  }],
+  averageRating: { type: Number, default: 0 },
+  totalSales: { type: Number, default: 0 },
+  relatedProducts: [{ type: mongoose.Schema.Types.ObjectId, ref: 'Product' }],
+  featured: {
+    type: Boolean,
+    default: false
+  }
 }, {
   timestamps: true,
   toJSON: { virtuals: true },
@@ -255,38 +274,60 @@ const productSchema = new mongoose.Schema({
 
 // Indexes for better query performance
 productSchema.index({ name: 'text', 'description.short': 'text', 'description.full': 'text' });
+<<<<<<< HEAD
 productSchema.index({ 'category.main': 1 });
 productSchema.index({ status: 1 });
 productSchema.index({ 'pricing.base': 1 });
 productSchema.index({ 'rating.average': -1 });
+=======
+productSchema.index({ 'category.main': 1, status: 1 });
+productSchema.index({ shop: 1, status: 1 });
+productSchema.index({ seller: 1, createdAt: -1 });
+productSchema.index({ 'pricing.base': 1, status: 1 });
+productSchema.index({ featured: 1, status: 1 });
+>>>>>>> ce08c47481366906128db17c6bd3eaf53dc5d6a3
 
-// Pre-save middleware to generate slug
-productSchema.pre('save', function(next) {
-  if (this.isModified('name')) {
-    this.slug = this.name
-      .toLowerCase()
-      .replace(/[^a-z0-9]+/g, '-')
-      .replace(/(^-|-$)+/g, '');
+// Auto-generate slug from name
+productSchema.pre('save', async function(next) {
+  if (!this.slug) {
+    this.slug = autoGenerateSlug(this.name);
   }
   next();
 });
 
-// Virtual for discount percentage
-productSchema.virtual('discountPercentage').get(function() {
-  if (this.pricing.base && this.pricing.discounted) {
-    return Math.round(((this.pricing.base - this.pricing.discounted) / this.pricing.base) * 100);
-  }
-  return 0;
+// Virtual for current price
+productSchema.virtual('currentPrice').get(function() {
+  return this.pricing.discounted || this.pricing.base;
 });
 
-// Method to check if product is in stock
-productSchema.methods.isInStock = function() {
-  return this.inventory.stock > 0;
+// Method to check stock availability
+productSchema.methods.checkAvailability = function(quantity) {
+  return this.inventory.stock >= quantity;
 };
 
-// Method to check if product needs restock
-productSchema.methods.needsRestock = function() {
-  return this.inventory.stock <= this.inventory.minStock;
+// Method to update stock
+productSchema.methods.updateStock = async function(quantity, operation = 'decrease') {
+  if (operation === 'decrease') {
+    if (this.inventory.stock < quantity) {
+      throw new Error('Insufficient stock');
+    }
+    this.inventory.stock -= quantity;
+  } else {
+    this.inventory.stock += quantity;
+  }
+  await this.save();
+};
+
+// Method to add review
+productSchema.methods.addReview = async function(userId, rating, comment) {
+  this.reviews.push({ user: userId, rating, comment });
+  
+  // Update average rating
+  const totalRating = this.reviews.reduce((sum, review) => sum + review.rating, 0);
+  this.rating.average = totalRating / this.reviews.length;
+  this.rating.count = this.reviews.length;
+  
+  await this.save();
 };
 
 const Product = mongoose.models.Product || mongoose.model('Product', productSchema);

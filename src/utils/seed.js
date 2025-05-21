@@ -7,6 +7,7 @@ import User from '../models/User.js';
 import Shop from '../models/Shop.js';
 import Product from '../models/Product.js';
 import Blog from '../models/Blog.js';
+import connectDB from '../lib/mongodb.js';
 
 // Get the directory name in ES modules
 const __filename = fileURLToPath(import.meta.url);
@@ -19,10 +20,117 @@ dotenv.config({ path: path.join(__dirname, '../../.env') });
 
 const MONGODB_URI = process.env.MONGODB_URI || 'mongodb://localhost:27017/blocal';
 
+<<<<<<< HEAD
 if (!MONGODB_URI) {
   console.error("❌ MONGODB_URI is not defined. Check your .env file.");
   process.exit(1);
 }
+=======
+async function createTestAccounts() {
+  // Create admin account
+  const adminPassword = await hash('admin123', 12);
+  const admin = await User.findOneAndUpdate(
+    { email: 'admin@blocal.bt' },
+    {
+      name: 'Admin User',
+      email: 'admin@blocal.bt',
+      password: adminPassword,
+      role: 'ADMIN',
+      emailVerified: true,
+      status: 'active',
+      profile: {
+        phoneNumber: '17111111',
+        address: {
+          street: 'Norzin Lam',
+          city: 'Thimphu',
+          state: 'Thimphu',
+          zipCode: '11001',
+          country: 'Bhutan'
+        }
+      }
+    },
+    { upsert: true, new: true }
+  );
+  console.log('✅ Admin account created:', admin.email);
+
+  // Create seller account
+  const sellerPassword = await hash('seller123', 12);
+  const seller = await User.findOneAndUpdate(
+    { email: 'seller@blocal.bt' },
+    {
+      name: 'Test Seller',
+      email: 'seller@blocal.bt',
+      password: sellerPassword,
+      role: 'SELLER',
+      emailVerified: true,
+      status: 'active',
+      profile: {
+        phoneNumber: '17222222',
+        address: {
+          street: 'Chang Lam',
+          city: 'Thimphu',
+          state: 'Thimphu',
+          zipCode: '11001',
+          country: 'Bhutan'
+        }
+      }
+    },
+    { upsert: true, new: true }
+  );
+  console.log('✅ Seller account created:', seller.email);
+
+  // Create shop for seller
+  const sellerShop = await Shop.findOneAndUpdate(
+    { owner: seller._id },
+    {
+      name: 'Test Shop',
+      description: 'A test shop for development purposes',
+      owner: seller._id,
+      location: 'Thimphu',
+      contact: {
+        phone: '17222222',
+        email: 'seller@blocal.bt'
+      },
+      status: 'active'
+    },
+    { upsert: true, new: true }
+  );
+  console.log('✅ Shop created for seller:', sellerShop.name);
+
+  // Create buyer account
+  const buyerPassword = await hash('buyer123', 12);
+  const buyer = await User.findOneAndUpdate(
+    { email: 'buyer@blocal.bt' },
+    {
+      name: 'Test Buyer',
+      email: 'buyer@blocal.bt',
+      password: buyerPassword,
+      role: 'BUYER',
+      emailVerified: true,
+      status: 'active',
+      profile: {
+        phoneNumber: '17333333',
+        address: {
+          street: 'Doebum Lam',
+          city: 'Thimphu',
+          state: 'Thimphu',
+          zipCode: '11001',
+          country: 'Bhutan'
+        }
+      }
+    },
+    { upsert: true, new: true }
+  );
+  console.log('✅ Buyer account created:', buyer.email);
+
+  return { admin, seller, buyer, sellerShop };
+}
+
+async function seed() {
+  try {
+    await mongoose.connect(MONGODB_URI);
+    console.log('Connected to MongoDB');
+>>>>>>> ce08c47481366906128db17c6bd3eaf53dc5d6a3
 
 async function dropCollections(collections) {
   for (const collection of collections) {
@@ -115,6 +223,7 @@ async function seedDatabase() {
     }
   });
 
+<<<<<<< HEAD
   // Create seller users
   const seller1 = await createOrUpdateUser('seller1@blocal.bt', {
     email: 'seller1@blocal.bt',
@@ -193,6 +302,28 @@ async function seedDatabase() {
       media: {
         logo: '/images/shops/skye-logo.jpg',
         coverImage: '/images/shops/skye-cover.jpg'
+=======
+    // Create test accounts
+    const { admin, seller, buyer, sellerShop } = await createTestAccounts();
+
+    // Create Skye shop
+    const shop = await Shop.findOneAndUpdate(
+      { owner: admin._id },
+      {
+        name: 'Skye',
+        description: 'Fresh fruits and vegetables market',
+        logo: '/images/products/vegetables-hero.jpg',
+        address: {
+          street: 'Norzin Lam',
+          city: 'Thimphu',
+          state: 'Thimphu',
+          zipCode: '11001',
+          country: 'Bhutan'
+        },
+        status: 'APPROVED',
+        isActive: true,
+        owner: admin._id
+>>>>>>> ce08c47481366906128db17c6bd3eaf53dc5d6a3
       },
       verification: {
         isVerified: true,
@@ -284,6 +415,7 @@ async function seedDatabase() {
     shops.push(shop);
   }
 
+<<<<<<< HEAD
   // Helper to create SKU
   const generateSKU = (prefix, name) =>
     `${prefix}-${name.toUpperCase().replace(/-/g, '').substring(0, 3)}-${Math.floor(Math.random() * 1000)}`;
@@ -310,6 +442,24 @@ async function seedDatabase() {
       const sku = generateSKU('FR', fruit);
 
       await createOrUpdateProduct(
+=======
+    const fruitPrices = {
+      'apple': 120, // Price per kg
+      'banana': 80,  // Price per dozen
+      'blueberry': 250, // Price per box
+      'grapes': 180, // Price per kg
+      'mango': 150, // Price per kg
+      'orange': 100, // Price per kg
+      'strawberries': 200 // Price per box
+    };
+
+    for (const fruit of fruits) {
+      const name = fruit.charAt(0).toUpperCase() + fruit.slice(1);
+      const basePrice = fruitPrices[fruit];
+      const initialStock = Math.floor(Math.random() * 50) + 30; // Higher initial stock
+      
+      await Product.findOneAndUpdate(
+>>>>>>> ce08c47481366906128db17c6bd3eaf53dc5d6a3
         {
           name,
           slug,
@@ -319,6 +469,7 @@ async function seedDatabase() {
           },
           media: {
             mainImage: `/images/products/fruits/${fruit}.jpg`,
+<<<<<<< HEAD
             gallery: [
               `/images/products/fruits/${fruit}-1.jpg`,
               `/images/products/fruits/${fruit}-2.jpg`,
@@ -335,6 +486,21 @@ async function seedDatabase() {
             stock: Math.floor(Math.random() * 50) + 10,
             minStock: 5,
             reserved: 0,
+=======
+            gallery: [] // Remove non-existent gallery images
+          },
+          pricing: {
+            base: basePrice,
+            discounted: Math.floor(basePrice * 0.9),
+            discount: 10,
+            currency: 'Nu.'
+          },
+          inventory: {
+            sku: `FR-${fruit.toUpperCase().substring(0, 3)}-${Math.floor(Math.random() * 1000)}`,
+            stock: initialStock,
+            minStock: Math.floor(initialStock * 0.2), // 20% of initial stock as minimum
+            reserved: 0
+>>>>>>> ce08c47481366906128db17c6bd3eaf53dc5d6a3
           },
           category: {
             main: 'FRUITS',
@@ -369,8 +535,13 @@ async function seedDatabase() {
         },
         { name, shop: shops[0]._id }
       );
+<<<<<<< HEAD
     })
   );
+=======
+      console.log(`Created fruit: ${fruit} with price Nu. ${basePrice}`);
+    }
+>>>>>>> ce08c47481366906128db17c6bd3eaf53dc5d6a3
 
   // Create vegetables concurrently
   const vegetables = [
@@ -391,6 +562,7 @@ async function seedDatabase() {
     'cabbage'
   ];
 
+<<<<<<< HEAD
   await Promise.all(
     vegetables.map(async (vegetable) => {
       const normalizedName = vegetable.replace(/-/g, ' ');
@@ -398,6 +570,26 @@ async function seedDatabase() {
       const slug = vegetable.toLowerCase();
       const basePrice = Math.floor(Math.random() * 30) + 20;
       const sku = generateSKU('VEG', vegetable);
+=======
+    const vegPrices = {
+      'arugula': 80, // Price per bunch
+      'broccoli': 120, // Price per head
+      'carrot': 60, // Price per kg
+      'cucumber': 40, // Price per kg
+      'kale': 70, // Price per bunch
+      'lettuce': 90, // Price per head
+      'potato': 50, // Price per kg
+      'spinach': 60, // Price per bunch
+      'sweet-potato': 70, // Price per kg
+      'tomato': 80 // Price per kg
+    };
+
+    for (const vegetable of vegetables) {
+      const name = vegetable.charAt(0).toUpperCase() + vegetable.slice(1).replace('-', ' ');
+      const slug = vegetable.toLowerCase();
+      const basePrice = vegPrices[vegetable];
+      const initialStock = Math.floor(Math.random() * 50) + 40; // Higher initial stock for vegetables
+>>>>>>> ce08c47481366906128db17c6bd3eaf53dc5d6a3
 
       await createOrUpdateProduct(
         {
@@ -409,6 +601,7 @@ async function seedDatabase() {
           },
           media: {
             mainImage: `/images/products/vegetables/${vegetable}.jpg`,
+<<<<<<< HEAD
             gallery: [
               `/images/products/vegetables/${vegetable}-1.jpg`,
               `/images/products/vegetables/${vegetable}-2.jpg`,
@@ -425,6 +618,21 @@ async function seedDatabase() {
             stock: Math.floor(Math.random() * 50) + 10,
             minStock: 5,
             reserved: 0,
+=======
+            gallery: [] // Remove non-existent gallery images
+          },
+          pricing: {
+            base: basePrice,
+            discounted: Math.floor(basePrice * 0.9),
+            discount: 10,
+            currency: 'Nu.'
+          },
+          inventory: {
+            sku: `VEG-${vegetable.toUpperCase().replace('-', '').substring(0, 3)}-${Math.floor(Math.random() * 1000)}`,
+            stock: initialStock,
+            minStock: Math.floor(initialStock * 0.2), // 20% of initial stock as minimum
+            reserved: 0
+>>>>>>> ce08c47481366906128db17c6bd3eaf53dc5d6a3
           },
           category: {
             main: 'VEGETABLES',
@@ -459,6 +667,7 @@ async function seedDatabase() {
         },
         { name, shop: shops[0]._id }
       );
+<<<<<<< HEAD
     })
   );
 
@@ -524,6 +733,30 @@ async function seedDatabase() {
 
   for (const post of blogs) {
     await createOrUpdateBlog(post);
+=======
+      console.log(`Created vegetable: ${vegetable} with price Nu. ${basePrice}`);
+    }
+
+    console.log('\nTest Accounts Created Successfully!');
+    console.log('\nLogin Credentials:');
+    console.log('------------------');
+    console.log('Admin:');
+    console.log('Email: admin@blocal.bt');
+    console.log('Password: admin123');
+    console.log('\nSeller:');
+    console.log('Email: seller@blocal.bt');
+    console.log('Password: seller123');
+    console.log('\nBuyer:');
+    console.log('Email: buyer@blocal.bt');
+    console.log('Password: buyer123');
+
+    console.log('\nDatabase seeded successfully!');
+  } catch (error) {
+    console.error('Error seeding database:', error);
+  } finally {
+    await mongoose.disconnect();
+    console.log('Disconnected from database');
+>>>>>>> ce08c47481366906128db17c6bd3eaf53dc5d6a3
   }
 
   console.log("🎉 Seeding complete!");

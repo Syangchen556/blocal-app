@@ -1,10 +1,17 @@
+<<<<<<< HEAD
 # Blocal - Local Marketplace Platform
 
 A Next.js-based marketplace platform for local businesses with role-based authentication and comprehensive shop management.
+=======
+# BLocal - Local Marketplace
+
+A Next.js-based online marketplace for local products with role-based authentication and MongoDB Atlas integration.
+>>>>>>> ce08c47481366906128db17c6bd3eaf53dc5d6a3
 
 ## Features
 
 - Role-based authentication (Admin, Seller, Buyer)
+<<<<<<< HEAD
 - Comprehensive shop management system
 - Product catalog with categories and variants
 - Shopping cart and wishlist functionality
@@ -13,9 +20,21 @@ A Next.js-based marketplace platform for local businesses with role-based authen
 - Rating and review system
 - Order management
 - Analytics and statistics
+=======
+- MongoDB Atlas integration for cloud database
+- Beautiful and responsive UI with Tailwind CSS
+- Product catalog with categories and search
+- Shopping cart with animations
+- Wishlist functionality
+- Blog system with user-generated content
+- Shop profiles and analytics
+- Real-time product reviews and ratings
+- Bhutanese Ngultrum (Nu.) currency support
+>>>>>>> ce08c47481366906128db17c6bd3eaf53dc5d6a3
 
-## Demo Accounts
+## Tech Stack
 
+<<<<<<< HEAD
 ```
 Admin:
 - Email: admin@blocal.bt
@@ -29,10 +48,19 @@ Buyer:
 - Email: buyer@blocal.bt
 - Password: buyer123
 ```
+=======
+- Next.js 14
+- MongoDB Atlas
+- NextAuth.js for authentication
+- Tailwind CSS for styling
+- React Icons
+- React Hot Toast for notifications
+>>>>>>> ce08c47481366906128db17c6bd3eaf53dc5d6a3
 
 ## Prerequisites
 
 - Node.js 18.x or later
+- MongoDB Atlas account
 - npm or yarn
 - MongoDB 6.0 or later
 
@@ -47,18 +75,23 @@ cd blocal-app
 2. Install dependencies:
 ```bash
 npm install
-# or
-yarn install
 ```
 
+<<<<<<< HEAD
 3. Set up environment variables:
 Create a `.env.local` file in the root directory with the following variables:
 ```env
 MONGODB_URI=your_mongodb_uri
+=======
+3. Create a `.env.local` file in the root directory with the following variables:
+```env
+MONGODB_URI=your_mongodb_atlas_connection_string
+>>>>>>> ce08c47481366906128db17c6bd3eaf53dc5d6a3
 NEXTAUTH_SECRET=your_nextauth_secret
 NEXTAUTH_URL=http://localhost:3000
 ```
 
+<<<<<<< HEAD
 4. Seed the database:
 ```bash
 npm run seed
@@ -67,13 +100,18 @@ yarn seed
 ```
 
 5. Run the development server:
+=======
+4. Run the development server:
+>>>>>>> ce08c47481366906128db17c6bd3eaf53dc5d6a3
 ```bash
 npm run dev
-# or
-yarn dev
 ```
 
+<<<<<<< HEAD
 6. Open [http://localhost:3000](http://localhost:3000) with your browser to see the result.
+=======
+5. Open [http://localhost:3000](http://localhost:3000) with your browser to see the result.
+>>>>>>> ce08c47481366906128db17c6bd3eaf53dc5d6a3
 
 ## Project Structure
 
@@ -81,6 +119,7 @@ yarn dev
 ├── src/
 │   ├── app/                 # Next.js app directory
 │   │   ├── api/            # API routes
+<<<<<<< HEAD
 │   │   │   ├── shops/     # Shop management endpoints
 │   │   │   ├── products/  # Product management endpoints
 │   │   │   └── auth/      # Authentication endpoints
@@ -97,11 +136,29 @@ yarn dev
 │   └── styles/           # Global styles
 ├── public/               # Static files
 └── package.json         # Project dependencies
+=======
+│   │   ├── auth/           # Authentication pages
+│   │   ├── blog/           # Blog pages
+│   │   ├── cart/           # Shopping cart
+│   │   ├── dashboard/      # User dashboards
+│   │   ├── products/       # Product pages
+│   │   ├── shops/          # Shop pages
+│   │   └── wishlist/       # Wishlist pages
+│   ├── components/         # React components
+│   │   ├── ui/            # UI components
+│   │   ├── products/      # Product components
+│   │   └── layout/        # Layout components
+│   ├── lib/               # Utility functions
+│   └── models/            # MongoDB models
+├── public/                # Static files
+└── package.json          # Project dependencies
+>>>>>>> ce08c47481366906128db17c6bd3eaf53dc5d6a3
 ```
 
-## Role-Based Features
+## Features by Role
 
 ### Admin
+<<<<<<< HEAD
 - User management
 - Shop verification and approval
 - Analytics dashboard
@@ -239,6 +296,46 @@ yarn dev
     "text": "Comment text"
   }
   ```
+=======
+- User and shop management
+- Product approval system
+- Analytics dashboard
+- Blog moderation
+
+### Seller
+- Shop profile management
+- Product management (CRUD)
+- Sales analytics
+- Shop statistics
+- Blog creation
+
+### Buyer
+- Browse and search products
+- Shopping cart with animations
+- Wishlist management
+- Product reviews
+- Blog creation and interaction
+- Shop browsing
+
+## API Routes
+
+- `/api/auth/*` - Authentication endpoints
+- `/api/products/*` - Product management
+- `/api/shops/*` - Shop management
+- `/api/cart/*` - Shopping cart operations
+- `/api/wishlist/*` - Wishlist operations
+- `/api/blogs/*` - Blog management
+- `/api/upload/*` - File upload handling
+
+## Models
+
+- User - User information and authentication
+- Shop - Shop profiles and management
+- Product - Product listings and details
+- Blog - Blog posts and interactions
+- Cart - Shopping cart data
+- Wishlist - User wishlist items
+>>>>>>> ce08c47481366906128db17c6bd3eaf53dc5d6a3
 
 ## Contributing
 
