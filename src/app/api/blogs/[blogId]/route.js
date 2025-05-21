@@ -1,7 +1,7 @@
 import { NextResponse } from 'next/server';
 import { getServerSession } from 'next-auth';
-import connectDB from '@/lib/mongodb';
-import Blog from '@/models/Blog';
+import connectDB from '../../lib/mongodb';
+import Blog from '../models/Blog';
 
 // GET /api/blogs/[blogId] - Get a single blog
 export async function GET(request, { params }) {

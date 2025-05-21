@@ -1,12 +1,12 @@
-import { NextResponse } from 'next/server';
-import bcrypt from 'bcryptjs';
-import connectDB from '@/lib/mongodb';
-import User from '@/models/User';
+const { NextResponse } = require('next/server');
+const { connectDB } = require('@/lib/mongodb');
+const bcrypt = require('bcryptjs');
 
-export async function POST(req) {
+async function POST(req) {
   try {
-    const { name, email, password, role = 'BUYER' } = await req.json();
+    const { name, email, password } = await req.json();
 
+    // Validate required fields
     if (!name || !email || !password) {
       return NextResponse.json(
         { error: 'Missing required fields' },
@@ -14,11 +14,10 @@ export async function POST(req) {
       );
     }
 
-    await connectDB();
+    const db = await connectDB();
 
     // Check if user already exists
-    const existingUser = await User.findOne({ email });
-
+    const existingUser = await db.collection('users').findOne({ email });
     if (existingUser) {
       return NextResponse.json(
         { error: 'User already exists' },
@@ -30,23 +29,21 @@ export async function POST(req) {
     const hashedPassword = await bcrypt.hash(password, 10);
 
     // Create user
-    const user = await User.create({
+    const user = {
       name,
       email,
       password: hashedPassword,
-      role,
-    });
-
-    // Remove password from response
-    const userResponse = {
-      id: user._id.toString(),
-      name: user.name,
-      email: user.email,
-      role: user.role,
-      createdAt: user.createdAt,
+      role: 'USER', // Default role
+      createdAt: new Date(),
+      updatedAt: new Date()
     };
 
-    return NextResponse.json(userResponse, { status: 201 });
+    await db.collection('users').insertOne(user);
+
+    return NextResponse.json(
+      { message: 'User created successfully' },
+      { status: 201 }
+    );
   } catch (error) {
     console.error('Registration error:', error);
     return NextResponse.json(
@@ -54,4 +51,6 @@ export async function POST(req) {
       { status: 500 }
     );
   }
-} 
+}
+
+module.exports = { POST }; 

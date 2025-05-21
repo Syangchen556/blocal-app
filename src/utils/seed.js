@@ -1,327 +1,542 @@
 import mongoose from 'mongoose';
-import pkg from 'bcryptjs';
-const { hash } = pkg;
+import bcrypt from 'bcryptjs';
+import dotenv from 'dotenv';
+import path from 'path';
+import { fileURLToPath } from 'url';
 import User from '../models/User.js';
 import Shop from '../models/Shop.js';
 import Product from '../models/Product.js';
 import Blog from '../models/Blog.js';
 
+// Get the directory name in ES modules
+const __filename = fileURLToPath(import.meta.url);
+const __dirname = path.dirname(__filename);
+
+console.log("Starting the seed script...");
+
+// Load environment variables from .env
+dotenv.config({ path: path.join(__dirname, '../../.env') });
+
 const MONGODB_URI = process.env.MONGODB_URI || 'mongodb://localhost:27017/blocal';
 
-async function seed() {
-  try {
-    await mongoose.connect(MONGODB_URI);
-    console.log('Connected to MongoDB');
+if (!MONGODB_URI) {
+  console.error("❌ MONGODB_URI is not defined. Check your .env file.");
+  process.exit(1);
+}
 
-    // Drop existing collections
-    const collections = ['users', 'shops', 'products', 'blogs'];
-    for (const collection of collections) {
-      try {
+async function dropCollections(collections) {
+  for (const collection of collections) {
+    try {
+      const exists = await mongoose.connection.db.listCollections({ name: collection }).hasNext();
+      if (exists) {
         await mongoose.connection.db.dropCollection(collection);
-        console.log(`Dropped ${collection} collection`);
-      } catch (error) {
-        // Collection might not exist, which is fine
-        console.log(`Collection ${collection} might not exist, continuing...`);
+        console.log(`✅ Dropped collection: ${collection}`);
+      } else {
+        console.log(`ℹ️ Collection ${collection} does not exist, skipping drop.`);
+      }
+    } catch (error) {
+      console.error(`❌ Error dropping collection ${collection}:`, error);
+      throw error;
+    }
+  }
+}
+
+async function createOrUpdateUser(email, userData) {
+  try {
+    const user = await User.findOneAndUpdate({ email }, userData, { upsert: true, new: true });
+    console.log(`✅ User created/updated: ${email}`);
+    return user;
+  } catch (error) {
+    console.error(`❌ Error creating/updating user ${email}:`, error);
+    throw error;
+  }
+}
+
+async function createOrUpdateShop(shopData) {
+  try {
+    const shop = await Shop.findOneAndUpdate({ owner: shopData.owner }, shopData, { upsert: true, new: true });
+    console.log(`✅ Shop created/updated: ${shopData.name}`);
+    return shop;
+  } catch (error) {
+    console.error(`❌ Error creating/updating shop ${shopData.name}:`, error);
+    throw error;
+  }
+}
+
+async function createOrUpdateProduct(productData, query) {
+  try {
+    await Product.findOneAndUpdate(query, productData, { upsert: true, new: true });
+    console.log(`✅ Product created/updated: ${productData.name}`);
+  } catch (error) {
+    console.error(`❌ Error creating/updating product ${productData.name}:`, error);
+    throw error;
+  }
+}
+
+async function createOrUpdateBlog(postData) {
+  try {
+    await Blog.findOneAndUpdate({ title: postData.title }, postData, { upsert: true, new: true });
+    console.log(`✅ Blog post created/updated: ${postData.title}`);
+  } catch (error) {
+    console.error(`❌ Error creating/updating blog post ${postData.title}:`, error);
+    throw error;
+  }
+}
+
+async function seedDatabase() {
+  console.log("⚙️ Seeding data...");
+
+  // Collections to drop before seeding
+  const collections = ['users', 'shops', 'products', 'blogs'];
+  await dropCollections(collections);
+
+  // Password hashes (reuse to save time)
+  const adminPasswordHash = bcrypt.hashSync('admin123', 12);
+  const sellerPasswordHash = bcrypt.hashSync('seller123', 12);
+  const buyerPasswordHash = bcrypt.hashSync('buyer123', 12);
+
+  // Create admin user
+  const admin = await createOrUpdateUser('admin@blocal.bt', {
+    email: 'admin@blocal.bt',
+    name: 'Admin User',
+    password: adminPasswordHash,
+    role: 'ADMIN',
+    status: 'active',
+    emailVerified: true,
+    profile: {
+      phoneNumber: '+975-17123456',
+      address: {
+        street: 'Norzin Lam',
+        city: 'Thimphu',
+        state: 'Thimphu',
+        zipCode: '11001',
+        country: 'Bhutan'
       }
     }
+  });
 
-    // Create admin user
-    const adminPassword = await hash('admin123', 12);
-    const admin = await User.findOneAndUpdate(
-      { email: 'admin@blocal.bt' },
-      {
-        email: 'admin@blocal.bt',
-        name: 'Admin',
-        password: adminPassword,
-        role: 'ADMIN',
+  // Create seller users
+  const seller1 = await createOrUpdateUser('seller1@blocal.bt', {
+    email: 'seller1@blocal.bt',
+    name: 'John Doe',
+    password: sellerPasswordHash,
+    role: 'SELLER',
+    status: 'active',
+    emailVerified: true,
+    profile: {
+      phoneNumber: '+975-17234567',
+      address: {
+        street: 'Chang Lam',
+        city: 'Thimphu',
+        state: 'Thimphu',
+        zipCode: '11001',
+        country: 'Bhutan'
+      }
+    }
+  });
+
+  const seller2 = await createOrUpdateUser('seller2@blocal.bt', {
+    email: 'seller2@blocal.bt',
+    name: 'Jane Smith',
+    password: sellerPasswordHash,
+    role: 'SELLER',
+    status: 'active',
+    emailVerified: true,
+    profile: {
+      phoneNumber: '+975-17345678',
+      address: {
+        street: 'Doebum Lam',
+        city: 'Thimphu',
+        state: 'Thimphu',
+        zipCode: '11001',
+        country: 'Bhutan'
+      }
+    }
+  });
+
+  // Create buyer users
+  const buyer1 = await createOrUpdateUser('buyer1@blocal.bt', {
+    email: 'buyer1@blocal.bt',
+    name: 'Alice Johnson',
+    password: buyerPasswordHash,
+    role: 'BUYER',
+    status: 'active',
+    emailVerified: true,
+    profile: {
+      phoneNumber: '+975-17456789',
+      address: {
+        street: 'Motithang',
+        city: 'Thimphu',
+        state: 'Thimphu',
+        zipCode: '11001',
+        country: 'Bhutan'
+      }
+    }
+  });
+
+  // Create shops with different statuses
+  const shopsData = [
+    {
+      name: 'Skye Fresh Market',
+      description: 'Premium fresh fruits and vegetables market in Thimphu',
+      owner: admin._id,
+      address: {
+        street: 'Norzin Lam',
+        city: 'Thimphu',
+        state: 'Thimphu',
+        zipCode: '11001',
+        country: 'Bhutan'
       },
-      { upsert: true, new: true }
-    );
-
-    // Create Skye shop
-    const shop = await Shop.findOneAndUpdate(
-      { owner: admin._id },
-      {
-        name: 'Skye',
-        description: 'Fresh fruits and vegetables market',
-        logo: '/images/products/vegetables-hero.jpg',
-        address: {
-          street: 'Norzin Lam',
-          city: 'Thimphu',
-          state: 'Thimphu',
-          zipCode: '11001',
-          country: 'Bhutan'
-        },
-        status: 'APPROVED',
-        isActive: true,
-        owner: admin._id
+      phone: '+975-17567890',
+      email: 'skyefresh@blocal.bt',
+      status: 'active',
+      media: {
+        logo: '/images/shops/skye-logo.jpg',
+        coverImage: '/images/shops/skye-cover.jpg'
       },
-      { upsert: true, new: true }
-    );
+      verification: {
+        isVerified: true,
+        verifiedAt: new Date(),
+        verifiedBy: admin._id
+      },
+      statistics: {
+        totalSales: 150000,
+        totalOrders: 150,
+        totalProducts: 25
+      },
+      rating: {
+        average: 4.8,
+        count: 45
+      }
+    },
+    {
+      name: 'Organic Valley',
+      description: '100% organic produce from local farmers',
+      owner: seller1._id,
+      address: {
+        street: 'Chang Lam',
+        city: 'Thimphu',
+        state: 'Thimphu',
+        zipCode: '11001',
+        country: 'Bhutan'
+      },
+      phone: '+975-17678901',
+      email: 'organicvalley@blocal.bt',
+      status: 'active',
+      media: {
+        logo: '/images/shops/organic-valley-logo.jpg',
+        coverImage: '/images/shops/organic-valley-cover.jpg'
+      },
+      verification: {
+        isVerified: true,
+        verifiedAt: new Date(),
+        verifiedBy: admin._id
+      },
+      statistics: {
+        totalSales: 85000,
+        totalOrders: 85,
+        totalProducts: 15
+      },
+      rating: {
+        average: 4.9,
+        count: 32
+      }
+    },
+    {
+      name: 'Fresh Harvest',
+      description: 'Direct from farm to your table',
+      owner: seller2._id,
+      address: {
+        street: 'Doebum Lam',
+        city: 'Thimphu',
+        state: 'Thimphu',
+        zipCode: '11001',
+        country: 'Bhutan'
+      },
+      phone: '+975-17789012',
+      email: 'freshharvest@blocal.bt',
+      status: 'pending',
+      media: {
+        logo: '/images/shops/fresh-harvest-logo.jpg',
+        coverImage: '/images/shops/fresh-harvest-cover.jpg'
+      },
+      verification: {
+        isVerified: false,
+        verifiedAt: null,
+        verifiedBy: null
+      },
+      statistics: {
+        totalSales: 0,
+        totalOrders: 0,
+        totalProducts: 0
+      },
+      rating: {
+        average: 0,
+        count: 0
+      }
+    }
+  ];
 
-    // Add fruits
-    const fruits = [
-      'apple', 'banana', 'blueberry', 'grapes', 
-      'mango', 'orange', 'strawberries'
-    ];
+  // Create shops and save references for product creation
+  const shops = [];
+  for (const shopData of shopsData) {
+    const shop = await createOrUpdateShop(shopData);
+    shops.push(shop);
+  }
 
-    for (const fruit of fruits) {
+  // Helper to create SKU
+  const generateSKU = (prefix, name) =>
+    `${prefix}-${name.toUpperCase().replace(/-/g, '').substring(0, 3)}-${Math.floor(Math.random() * 1000)}`;
+
+  // Create fruits products concurrently
+  const fruits = [
+    'apple',
+    'banana',
+    'blueberry',
+    'grapes',
+    'mango',
+    'orange',
+    'strawberries',
+    'kiwi',
+    'pineapple',
+    'watermelon'
+  ];
+
+  await Promise.all(
+    fruits.map(async (fruit) => {
       const name = fruit.charAt(0).toUpperCase() + fruit.slice(1);
-      const basePrice = Math.floor(Math.random() * 50) + 50; // Random price between 50-100
-      
-      await Product.findOneAndUpdate(
+      const slug = fruit.toLowerCase();
+      const basePrice = Math.floor(Math.random() * 50) + 50;
+      const sku = generateSKU('FR', fruit);
+
+      await createOrUpdateProduct(
         {
-          name: name,
-          shop: shop._id
-        },
-        {
-          name: name,
-          slug: fruit.toLowerCase(),
+          name,
+          slug,
           description: {
             short: `Fresh ${fruit} from local farmers`,
-            full: `Our ${fruit} are carefully selected from local farmers to ensure the highest quality and freshness. Perfect for your daily fruit intake and healthy lifestyle.`
+            full: `Our ${fruit} are carefully selected from local farmers to ensure the highest quality and freshness.`,
           },
           media: {
             mainImage: `/images/products/fruits/${fruit}.jpg`,
             gallery: [
               `/images/products/fruits/${fruit}-1.jpg`,
-              `/images/products/fruits/${fruit}-2.jpg`
-            ]
+              `/images/products/fruits/${fruit}-2.jpg`,
+            ],
           },
           pricing: {
             base: basePrice,
-            discounted: basePrice * 0.9,
+            discounted: +(basePrice * 0.9).toFixed(2),
             discount: 10,
-            currency: 'BTN'
+            currency: 'BTN',
           },
           inventory: {
-            sku: `FR-${fruit.toUpperCase().substring(0, 3)}-${Math.floor(Math.random() * 1000)}`,
+            sku,
             stock: Math.floor(Math.random() * 50) + 10,
             minStock: 5,
-            reserved: 0
+            reserved: 0,
           },
           category: {
             main: 'FRUITS',
             sub: 'Fresh Fruits',
-            tags: ['fresh', 'local', 'organic', fruit.toLowerCase()]
+            tags: ['fresh', 'local', 'organic', slug],
           },
-          specifications: [
-            {
-              name: 'Origin',
-              value: 'Bhutan',
-              group: 'Source'
-            },
-            {
-              name: 'Farming Method',
-              value: 'Organic',
-              group: 'Production'
-            },
-            {
-              name: 'Storage',
-              value: 'Keep refrigerated',
-              group: 'Handling'
-            }
-          ],
+          seller: admin._id,
+          shop: shops[0]._id,
+          status: 'active',
           varieties: [
             {
               name: 'Regular',
-              sku: `FR-${fruit.toUpperCase().substring(0, 3)}-REG`,
+              sku: generateSKU('FR', `${fruit}-REG`),
               price: basePrice,
               stock: {
-                current: Math.floor(Math.random() * 30) + 10,
+                current: Math.floor(Math.random() * 50) + 10,
                 minimum: 5
               },
               status: 'active'
             },
             {
               name: 'Premium',
-              sku: `FR-${fruit.toUpperCase().substring(0, 3)}-PRE`,
+              sku: generateSKU('FR', `${fruit}-PRE`),
               price: basePrice * 1.2,
               stock: {
-                current: Math.floor(Math.random() * 20) + 5,
+                current: Math.floor(Math.random() * 30) + 5,
                 minimum: 3
               },
               status: 'active'
             }
-          ],
-          seller: admin._id,
-          shop: shop._id,
-          status: 'active',
-          seo: {
-            title: `Fresh ${name} - Locally Grown in Bhutan`,
-            description: `Buy fresh, organic ${fruit} directly from local Bhutanese farmers. Premium quality, sustainably grown.`,
-            keywords: ['fresh', 'organic', fruit, 'local', 'Bhutan', 'farmers market']
-          }
+          ]
         },
-        { upsert: true }
+        { name, shop: shops[0]._id }
       );
-      console.log(`Created fruit: ${fruit}`);
-    }
+    })
+  );
 
-    // Add vegetables
-    const vegetables = [
-      'arugula', 'broccoli', 'carrot', 'cucumber', 
-      'kale', 'lettuce', 'potato', 'spinach', 
-      'sweet-potato', 'tomato'
-    ];
+  // Create vegetables concurrently
+  const vegetables = [
+    'arugula',
+    'broccoli',
+    'carrot',
+    'cucumber',
+    'kale',
+    'lettuce',
+    'potato',
+    'spinach',
+    'sweet-potato',
+    'tomato',
+    'bell-pepper',
+    'eggplant',
+    'zucchini',
+    'cauliflower',
+    'cabbage'
+  ];
 
-    for (const vegetable of vegetables) {
-      const name = vegetable.charAt(0).toUpperCase() + vegetable.slice(1).replace('-', ' ');
+  await Promise.all(
+    vegetables.map(async (vegetable) => {
+      const normalizedName = vegetable.replace(/-/g, ' ');
+      const name = normalizedName.charAt(0).toUpperCase() + normalizedName.slice(1);
       const slug = vegetable.toLowerCase();
-      const basePrice = Math.floor(Math.random() * 30) + 20; // Random price between 20-50
+      const basePrice = Math.floor(Math.random() * 30) + 20;
+      const sku = generateSKU('VEG', vegetable);
 
-      await Product.findOneAndUpdate(
+      await createOrUpdateProduct(
         {
-          name: name,
-          shop: shop._id
-        },
-        {
-          name: name,
-          slug: slug,
+          name,
+          slug,
           description: {
-            short: `Fresh ${vegetable.replace('-', ' ')} from local farmers`,
-            full: `Our ${vegetable.replace('-', ' ')} are carefully selected from local farmers to ensure the highest quality and freshness. Perfect for your daily vegetable intake and healthy cooking.`
+            short: `Fresh ${normalizedName} from local farms`,
+            full: `Our ${normalizedName} are grown organically and harvested at peak freshness.`,
           },
           media: {
             mainImage: `/images/products/vegetables/${vegetable}.jpg`,
             gallery: [
               `/images/products/vegetables/${vegetable}-1.jpg`,
-              `/images/products/vegetables/${vegetable}-2.jpg`
-            ]
+              `/images/products/vegetables/${vegetable}-2.jpg`,
+            ],
           },
           pricing: {
             base: basePrice,
-            discounted: basePrice * 0.9,
-            discount: 10,
-            currency: 'BTN'
+            discounted: +(basePrice * 0.85).toFixed(2),
+            discount: 15,
+            currency: 'BTN',
           },
           inventory: {
-            sku: `VEG-${vegetable.toUpperCase().replace('-', '').substring(0, 3)}-${Math.floor(Math.random() * 1000)}`,
+            sku,
             stock: Math.floor(Math.random() * 50) + 10,
             minStock: 5,
-            reserved: 0
+            reserved: 0,
           },
           category: {
             main: 'VEGETABLES',
             sub: 'Fresh Vegetables',
-            tags: ['fresh', 'local', 'organic', vegetable.toLowerCase().replace('-', ' ')]
+            tags: ['fresh', 'local', 'organic', slug],
           },
-          specifications: [
-            {
-              name: 'Origin',
-              value: 'Bhutan',
-              group: 'Source'
-            },
-            {
-              name: 'Farming Method',
-              value: 'Organic',
-              group: 'Production'
-            },
-            {
-              name: 'Storage',
-              value: 'Keep refrigerated',
-              group: 'Handling'
-            },
-            {
-              name: 'Packaging',
-              value: 'Eco-friendly',
-              group: 'Packaging'
-            }
-          ],
+          seller: admin._id,
+          shop: shops[0]._id,
+          status: 'active',
           varieties: [
             {
               name: 'Regular',
-              sku: `VEG-${vegetable.toUpperCase().replace('-', '').substring(0, 3)}-REG`,
+              sku: generateSKU('VEG', `${vegetable}-REG`),
               price: basePrice,
               stock: {
-                current: Math.floor(Math.random() * 30) + 10,
+                current: Math.floor(Math.random() * 50) + 10,
                 minimum: 5
               },
               status: 'active'
             },
             {
-              name: 'Premium',
-              sku: `VEG-${vegetable.toUpperCase().replace('-', '').substring(0, 3)}-PRE`,
-              price: basePrice * 1.2,
+              name: 'Organic',
+              sku: generateSKU('VEG', `${vegetable}-ORG`),
+              price: basePrice * 1.3,
               stock: {
-                current: Math.floor(Math.random() * 20) + 5,
+                current: Math.floor(Math.random() * 30) + 5,
                 minimum: 3
               },
               status: 'active'
             }
-          ],
-          seller: admin._id,
-          shop: shop._id,
-          status: 'active',
-          seo: {
-            title: `Fresh ${name} - Locally Grown in Bhutan`,
-            description: `Buy fresh, organic ${vegetable.replace('-', ' ')} directly from local Bhutanese farmers. Premium quality, sustainably grown.`,
-            keywords: ['fresh', 'organic', vegetable.replace('-', ' '), 'local', 'Bhutan', 'farmers market']
-          }
+          ]
         },
-        { upsert: true }
+        { name, shop: shops[0]._id }
       );
-      console.log(`Created vegetable: ${vegetable}`);
-    }
+    })
+  );
 
-    // Add sample blog posts
-    const blogPosts = [
-      {
-        title: "The Benefits of Eating Local",
-        content: "Eating local food has numerous benefits for both your health and the environment. When you choose local produce, you're getting the freshest possible food while supporting local farmers and reducing transportation emissions...",
-        summary: "Discover why eating local food is better for you and the environment",
-        category: "SUSTAINABILITY",
-        tags: ["local food", "sustainability", "health"],
-        status: "PUBLISHED",
-        media: {
-          featuredImage: "/images/blog/local-food.jpg"
-        }
-      },
-      {
-        title: "Seasonal Vegetables Guide",
-        content: "Understanding which vegetables are in season can help you plan your meals better and ensure you're getting the most nutritious produce. This guide will help you navigate through seasonal vegetables in Bhutan...",
-        summary: "Learn about seasonal vegetables in Bhutan",
-        category: "FARMING",
-        tags: ["seasonal", "vegetables", "farming"],
-        status: "PUBLISHED",
-        media: {
-          featuredImage: "/images/blog/seasonal-vegetables.jpg"
-        }
-      },
-      {
-        title: "Simple Farm-to-Table Recipes",
-        content: "Make the most of your local produce with these simple yet delicious recipes. From fresh salads to hearty soups, we've got you covered with recipes that celebrate local ingredients...",
-        summary: "Easy recipes using local ingredients",
-        category: "RECIPES",
-        tags: ["recipes", "cooking", "local ingredients"],
-        status: "PUBLISHED",
-        media: {
-          featuredImage: "/images/blog/recipes.jpg"
-        }
+  // Blog posts data with more varied categories and content
+  const blogs = [
+    {
+      title: 'Sustainable Farming in Bhutan',
+      slug: 'sustainable-farming-bhutan',
+      content: 'Bhutan is leading the way in sustainable farming practices...',
+      summary: 'Discover how Bhutan is pioneering sustainable farming methods',
+      author: admin._id,
+      publishedAt: new Date('2024-04-01'),
+      status: 'PUBLISHED',
+      category: 'FARMING',
+      tags: ['sustainability', 'farming', 'bhutan', 'organic'],
+      media: {
+        featuredImage: '/images/blogs/sustainable-farming.jpg'
       }
-    ];
-
-    for (const post of blogPosts) {
-      await Blog.findOneAndUpdate(
-        { title: post.title },
-        {
-          ...post,
-          author: admin._id,
-          publishedAt: new Date()
-        },
-        { upsert: true }
-      );
-      console.log(`Created blog post: ${post.title}`);
+    },
+    {
+      title: 'Top 5 Fruits to Boost Your Immunity',
+      slug: 'top-5-fruits-boost-immunity',
+      content: 'Discover the best fruits that can help strengthen your immune system...',
+      summary: 'Learn about the most nutritious fruits for your health',
+      author: seller1._id,
+      publishedAt: new Date('2024-04-15'),
+      status: 'PUBLISHED',
+      category: 'NUTRITION',
+      tags: ['health', 'fruits', 'immunity', 'nutrition'],
+      media: {
+        featuredImage: '/images/blogs/immune-fruits.jpg'
+      }
+    },
+    {
+      title: 'Seasonal Vegetables Guide',
+      slug: 'seasonal-vegetables-guide',
+      content: 'Understanding which vegetables are in season can help you plan your meals better...',
+      summary: 'A comprehensive guide to seasonal vegetables in Bhutan',
+      author: seller2._id,
+      publishedAt: new Date('2024-04-20'),
+      status: 'PUBLISHED',
+      category: 'RECIPES',
+      tags: ['vegetables', 'seasonal', 'cooking', 'recipes'],
+      media: {
+        featuredImage: '/images/blogs/seasonal-vegetables.jpg'
+      }
+    },
+    {
+      title: 'Organic Farming Benefits',
+      slug: 'organic-farming-benefits',
+      content: 'The benefits of organic farming extend beyond just healthy produce...',
+      summary: 'Explore the environmental and health benefits of organic farming',
+      author: admin._id,
+      publishedAt: new Date('2024-04-25'),
+      status: 'PUBLISHED',
+      category: 'SUSTAINABILITY',
+      tags: ['organic', 'farming', 'environment', 'sustainability'],
+      media: {
+        featuredImage: '/images/blogs/organic-farming.jpg'
+      }
     }
+  ];
 
-    console.log('Database seeded successfully!');
-  } catch (error) {
-    console.error('Error seeding database:', error);
-  } finally {
-    await mongoose.disconnect();
-    console.log('Disconnected from database');
+  for (const post of blogs) {
+    await createOrUpdateBlog(post);
   }
+
+  console.log("🎉 Seeding complete!");
+  process.exit(0);
 }
 
-// Run the seed function
-seed(); 
+mongoose
+  .connect(MONGODB_URI)
+  .then(() => {
+    console.log('✅ Connected to MongoDB');
+    return seedDatabase();
+  })
+  .catch((err) => {
+    console.error('❌ MongoDB connection error:', err);
+    process.exit(1);
+  });

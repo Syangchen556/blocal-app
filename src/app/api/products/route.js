@@ -1,163 +1,118 @@
-import { NextResponse } from 'next/server';
-import { getServerSession } from 'next-auth/next';
-import connectDB from '@/lib/mongodb';
-import Product from '@/models/Product';
-import Shop from '@/models/Shop';
-import { writeFile } from 'fs/promises';
-import path from 'path';
+const { NextResponse } = require('next/server');
+const { getServerSession } = require('next-auth/next');
+const { authOptions } = require('../../lib/auth');
+const { connectDB } = require('../../lib/mongodb');
+const Product = require('../../models/Product');
+const Shop = require('../../models/Shop');
+const { writeFile } = require('fs/promises');
+const path = require('path');
 
 // Get all products
-export async function GET(req) {
+async function GET(req) {
   try {
-    await connectDB();
-    
     const { searchParams } = new URL(req.url);
-    const query = searchParams.get('query') || '';
-    const seller = searchParams.get('seller') || '';
-    const category = searchParams.get('category') || '';
-    const status = searchParams.get('status') || '';
+    const category = searchParams.get('category');
+    const search = searchParams.get('search');
+    const page = parseInt(searchParams.get('page')) || 1;
+    const limit = parseInt(searchParams.get('limit')) || 10;
 
-    let filter = {};
-    if (query) {
-      filter = {
-        $or: [
-          { name: { $regex: query, $options: 'i' } },
-          { description: { $regex: query, $options: 'i' } },
-        ],
-      };
-    }
-    if (seller) {
-      filter.seller = seller;
-    }
+    const db = await connectDB();
+    let query = {};
+
     if (category) {
-      filter.category = category;
-    }
-    if (status) {
-      filter.status = status;
+      query.category = category;
     }
 
-    const products = await Product.find(filter)
-      .populate('seller', 'name email')
-      .populate('shop', 'name')
-      .sort({ createdAt: -1 });
+    if (search) {
+      query.$or = [
+        { name: { $regex: search, $options: 'i' } },
+        { description: { $regex: search, $options: 'i' } }
+      ];
+    }
 
-    return NextResponse.json(products);
+    const products = await db.collection('products')
+      .find(query)
+      .skip((page - 1) * limit)
+      .limit(limit)
+      .toArray();
+
+    const total = await db.collection('products').countDocuments(query);
+
+    return NextResponse.json({
+      products,
+      pagination: {
+        total,
+        page,
+        pages: Math.ceil(total / limit)
+      }
+    });
   } catch (error) {
     console.error('Error fetching products:', error);
-    return NextResponse.json(
-      { error: 'Error fetching products' },
-      { status: 500 }
-    );
+    return NextResponse.json({ error: 'Error fetching products' }, { status: 500 });
   }
 }
 
 // Create new product
-export async function POST(req) {
+async function POST(req) {
   try {
-    const session = await getServerSession();
-    if (!session) {
-      return NextResponse.json(
-        { error: 'Unauthorized' },
-        { status: 401 }
-      );
+    const session = await getServerSession(authOptions);
+    if (!session || session.user.role !== 'SELLER') {
+      return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
     }
 
-    if (session.user.role !== 'SELLER') {
-      return NextResponse.json(
-        { error: 'Only sellers can create products' },
-        { status: 403 }
-      );
+    const { name, description, price, category, images, stock } = await req.json();
+    if (!name || !description || !price || !category || !images || !stock) {
+      return NextResponse.json({ error: 'Missing required fields' }, { status: 400 });
     }
 
-    await connectDB();
-    
-    const formData = await req.formData();
-    const name = formData.get('name');
-    const description = formData.get('description');
-    const price = formData.get('price');
-    const category = formData.get('category');
-    const stock = formData.get('stock');
-    const image = formData.get('image');
-    const shopId = formData.get('shopId');
-
-    // Validate shop ownership
-    const shop = await Shop.findOne({ _id: shopId, owner: session.user.id });
-    if (!shop) {
-      return NextResponse.json(
-        { error: 'Shop not found or unauthorized' },
-        { status: 404 }
-      );
-    }
-
-    // Handle image upload
-    let imageUrl = '';
-    if (image) {
-      const bytes = await image.arrayBuffer();
-      const buffer = Buffer.from(bytes);
-      
-      // Create unique filename
-      const timestamp = Date.now();
-      const filename = `${timestamp}-${image.name}`;
-      const imagePath = path.join(process.cwd(), 'public', 'images', 'products', category, filename);
-      
-      await writeFile(imagePath, buffer);
-      imageUrl = `/images/products/${category}/${filename}`;
-    }
-
-    const product = await Product.create({
+    const db = await connectDB();
+    const product = {
       name,
       description,
-      price: parseFloat(price),
+      price,
       category,
-      stock: parseInt(stock),
-      imageUrl,
-      seller: session.user.id,
-      shop: shopId,
-      status: 'pending'
-    });
+      images,
+      stock,
+      sellerId: session.user.id,
+      createdAt: new Date(),
+      updatedAt: new Date()
+    };
 
-    return NextResponse.json(product);
+    const result = await db.collection('products').insertOne(product);
+
+    return NextResponse.json({
+      message: 'Product created successfully',
+      productId: result.insertedId
+    }, { status: 201 });
   } catch (error) {
     console.error('Error creating product:', error);
-    return NextResponse.json(
-      { error: 'Error creating product' },
-      { status: 500 }
-    );
+    return NextResponse.json({ error: 'Error creating product' }, { status: 500 });
   }
 }
 
 // Update product
-export async function PUT(req) {
+async function PUT(req) {
   try {
-    const session = await getServerSession();
+    const session = await getServerSession(authOptions);
     if (!session) {
-      return NextResponse.json(
-        { error: 'Unauthorized' },
-        { status: 401 }
-      );
+      return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
     }
 
-    await connectDB();
+    const db = await connectDB();
     const data = await req.json();
     const { id, ...updateData } = data;
 
-    let product = await Product.findById(id);
+    let product = await db.collection('products').findOne({ _id: id });
     if (!product) {
-      return NextResponse.json(
-        { error: 'Product not found' },
-        { status: 404 }
-      );
+      return NextResponse.json({ error: 'Product not found' }, { status: 404 });
     }
 
     // Only allow sellers to update their own products
     if (
       session.user.role === 'SELLER' &&
-      product.seller.toString() !== session.user.id
+      product.sellerId !== session.user.id
     ) {
-      return NextResponse.json(
-        { error: 'You can only update your own products' },
-        { status: 403 }
-      );
+      return NextResponse.json({ error: 'You can only update your own products' }, { status: 403 });
     }
 
     // Only allow admins to update status
@@ -165,64 +120,51 @@ export async function PUT(req) {
       delete updateData.status;
     }
 
-    product = await Product.findByIdAndUpdate(
-      id,
-      { ...updateData, updatedAt: new Date() },
-      { new: true }
-    ).populate('seller', 'name email');
+    const updatedProduct = await db.collection('products').findOneAndUpdate(
+      { _id: id },
+      { $set: { ...updateData, updatedAt: new Date() } },
+      { returnDocument: 'after' }
+    );
 
-    return NextResponse.json(product);
+    return NextResponse.json(updatedProduct);
   } catch (error) {
     console.error('Error updating product:', error);
-    return NextResponse.json(
-      { error: 'Error updating product' },
-      { status: 500 }
-    );
+    return NextResponse.json({ error: 'Error updating product' }, { status: 500 });
   }
 }
 
 // Delete product
-export async function DELETE(req) {
+async function DELETE(req) {
   try {
-    const session = await getServerSession();
+    const session = await getServerSession(authOptions);
     if (!session) {
-      return NextResponse.json(
-        { error: 'Unauthorized' },
-        { status: 401 }
-      );
+      return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
     }
 
-    await connectDB();
+    const db = await connectDB();
     const { searchParams } = new URL(req.url);
     const id = searchParams.get('id');
 
-    const product = await Product.findById(id);
+    const product = await db.collection('products').findOne({ _id: id });
     if (!product) {
-      return NextResponse.json(
-        { error: 'Product not found' },
-        { status: 404 }
-      );
+      return NextResponse.json({ error: 'Product not found' }, { status: 404 });
     }
 
     // Only allow sellers to delete their own products or admins to delete any product
     if (
       session.user.role === 'SELLER' &&
-      product.seller.toString() !== session.user.id
+      product.sellerId !== session.user.id
     ) {
-      return NextResponse.json(
-        { error: 'You can only delete your own products' },
-        { status: 403 }
-      );
+      return NextResponse.json({ error: 'You can only delete your own products' }, { status: 403 });
     }
 
-    await Product.findByIdAndDelete(id);
+    await db.collection('products').deleteOne({ _id: id });
 
     return NextResponse.json({ message: 'Product deleted successfully' });
   } catch (error) {
     console.error('Error deleting product:', error);
-    return NextResponse.json(
-      { error: 'Error deleting product' },
-      { status: 500 }
-    );
+    return NextResponse.json({ error: 'Error deleting product' }, { status: 500 });
   }
-} 
+}
+
+module.exports = { GET, POST, PUT, DELETE }; 

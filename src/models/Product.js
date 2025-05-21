@@ -101,7 +101,8 @@ const productSchema = new mongoose.Schema({
   slug: {
     type: String,
     unique: true,
-    lowercase: true
+    lowercase: true,
+    index: true
   },
   description: {
     short: {
@@ -254,7 +255,6 @@ const productSchema = new mongoose.Schema({
 
 // Indexes for better query performance
 productSchema.index({ name: 'text', 'description.short': 'text', 'description.full': 'text' });
-productSchema.index({ slug: 1 });
 productSchema.index({ 'category.main': 1 });
 productSchema.index({ status: 1 });
 productSchema.index({ 'pricing.base': 1 });

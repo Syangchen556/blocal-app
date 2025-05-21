@@ -113,7 +113,11 @@ const shopSchema = new mongoose.Schema({
       type: mongoose.Schema.Types.ObjectId,
       ref: 'User'
     }
-  }
+  },
+  featuredBlogs: [{
+    type: mongoose.Schema.Types.ObjectId,
+    ref: 'Blog'
+  }]
 }, {
   timestamps: true,
   toJSON: { virtuals: true },

@@ -1,5 +1,6 @@
 import { NextResponse } from 'next/server';
-import { getServerSession } from 'next-auth';
+import { getServerSession } from 'next-auth/next';
+import { authOptions } from '@/lib/auth';
 import connectDB from '@/lib/mongodb';
 import Blog from '@/models/Blog';
 
@@ -69,7 +70,7 @@ export async function GET(request) {
 // POST /api/blogs - Create a new blog
 export async function POST(request) {
   try {
-    const session = await getServerSession();
+    const session = await getServerSession(authOptions);
     if (!session) {
       return NextResponse.json(
         { error: 'Unauthorized' },
@@ -91,16 +92,48 @@ export async function POST(request) {
       seo
     } = data;
 
+    // Validate required fields
+    if (!title) {
+      return NextResponse.json(
+        { error: 'Title is required' },
+        { status: 400 }
+      );
+    }
+
+    if (!content || content.length < 100) {
+      return NextResponse.json(
+        { error: 'Content is required and must be at least 100 characters' },
+        { status: 400 }
+      );
+    }
+
+    if (!category || !['RECIPES', 'FARMING', 'NUTRITION', 'SUSTAINABILITY', 'OTHER'].includes(category)) {
+      return NextResponse.json(
+        { error: 'Valid category is required (RECIPES, FARMING, NUTRITION, SUSTAINABILITY, OTHER)' },
+        { status: 400 }
+      );
+    }
+
+    if (!media?.featuredImage) {
+      return NextResponse.json(
+        { error: 'Featured image is required' },
+        { status: 400 }
+      );
+    }
+
     // Create blog
     const blog = await Blog.create({
       title,
       content,
       summary,
       category,
-      tags,
-      media,
-      status,
-      seo,
+      tags: tags || [],
+      media: {
+        featuredImage: media.featuredImage,
+        gallery: media.gallery || []
+      },
+      status: status || 'DRAFT',
+      seo: seo || {},
       author: session.user.id,
       publishedAt: status === 'PUBLISHED' ? new Date() : null,
       metadata: {
@@ -116,8 +149,18 @@ export async function POST(request) {
     return NextResponse.json(blog);
   } catch (error) {
     console.error('Error creating blog:', error);
+    
+    // Handle mongoose validation errors
+    if (error.name === 'ValidationError') {
+      const errors = Object.values(error.errors).map(err => err.message);
+      return NextResponse.json(
+        { error: 'Validation failed', details: errors },
+        { status: 400 }
+      );
+    }
+
     return NextResponse.json(
-      { error: 'Failed to create blog' },
+      { error: 'Failed to create blog', details: error.message },
       { status: 500 }
     );
   }

@@ -1,40 +1,39 @@
-import mongoose from 'mongoose';
+import { MongoClient } from 'mongodb';
 
-const MONGODB_URI = process.env.MONGODB_URI;
-
-if (!MONGODB_URI) {
-  throw new Error('Please define the MONGODB_URI environment variable inside .env');
+if (!process.env.MONGODB_URI) {
+  throw new Error('Please add your Mongo URI to .env.local');
 }
 
-let cached = global.mongoose;
+const uri = process.env.MONGODB_URI;
+const options = {};
 
-if (!cached) {
-  cached = global.mongoose = { conn: null, promise: null };
+let client;
+let clientPromise;
+
+if (process.env.NODE_ENV === 'development') {
+  if (!global._mongoClientPromise) {
+    client = new MongoClient(uri, options);
+    global._mongoClientPromise = client.connect();
+  }
+  clientPromise = global._mongoClientPromise;
+} else {
+  client = new MongoClient(uri, options);
+  clientPromise = client.connect();
 }
 
-async function connectDB() {
-  if (cached.conn) {
-    return cached.conn;
-  }
-
-  if (!cached.promise) {
-    const opts = {
-      bufferCommands: false,
-    };
-
-    cached.promise = mongoose.connect(MONGODB_URI, opts).then((mongoose) => {
-      return mongoose;
-    });
-  }
-
+export async function connectDB() {
+  const client = await clientPromise;
+  const db = client.db(process.env.MONGODB_DB);
+  
+  // Create indexes if they don't exist
   try {
-    cached.conn = await cached.promise;
-  } catch (e) {
-    cached.promise = null;
-    throw e;
+    await db.collection('users').createIndex({ email: 1 }, { unique: true });
+    console.log('Database indexes created successfully');
+  } catch (error) {
+    console.error('Error creating database indexes:', error);
   }
-
-  return cached.conn;
+  
+  return db;
 }
 
-export default connectDB; 
+export default clientPromise; 

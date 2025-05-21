@@ -36,6 +36,8 @@ const BlogSchema = new mongoose.Schema({
   },
   summary: {
     type: String,
+    required: true,
+    trim: true,
     maxLength: [500, 'Summary cannot be more than 500 characters']
   },
   author: {
@@ -48,6 +50,11 @@ const BlogSchema = new mongoose.Schema({
     featuredImage: {
       type: String,
       required: [true, 'Please provide a featured image']
+    },
+    video: {
+      url: String,
+      thumbnail: String,
+      duration: Number
     },
     gallery: [{
       type: String
@@ -78,7 +85,7 @@ const BlogSchema = new mongoose.Schema({
     },
     readTime: {
       type: Number,
-      default: 0
+      required: true
     }
   },
   comments: [commentSchema],
@@ -123,4 +130,6 @@ BlogSchema.methods.isPublished = function() {
   return this.status === 'PUBLISHED';
 };
 
-export default mongoose.models.Blog || mongoose.model('Blog', BlogSchema); 
+const Blog = mongoose.models.Blog || mongoose.model('Blog', BlogSchema);
+
+export default Blog; 

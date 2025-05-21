@@ -1,57 +1,58 @@
 import { NextResponse } from 'next/server';
 import { getToken } from 'next-auth/jwt';
-import { authMiddleware } from './auth';
-import { rolesMiddleware } from './roles';
-import { shopMiddleware } from './shop';
-import { validateShop, validateProduct, validateBlog } from './validation';
 
-export async function middleware(request) {
-  const pathname = request.nextUrl.pathname;
+async function middleware(req) {
+  const pathname = req.nextUrl.pathname;
 
-  // API route validation
-  if (pathname.startsWith('/api/')) {
-    if (pathname.startsWith('/api/shop')) {
-      const validationResult = await validateShop(request);
-      if (validationResult instanceof NextResponse) {
-        return validationResult;
-      }
-    }
-    if (pathname.startsWith('/api/products')) {
-      const validationResult = await validateProduct(request);
-      if (validationResult instanceof NextResponse) {
-        return validationResult;
-      }
-    }
-    if (pathname.startsWith('/api/blogs')) {
-      const validationResult = await validateBlog(request);
-      if (validationResult instanceof NextResponse) {
-        return validationResult;
-      }
-    }
+  // Skip middleware for static files and API routes
+  if (
+    pathname.startsWith('/_next') ||
+    pathname.startsWith('/api') ||
+    pathname.startsWith('/static')
+  ) {
+    return NextResponse.next();
   }
 
-  // First run authentication middleware
-  const authResult = await authMiddleware(request);
-  if (authResult instanceof NextResponse) {
-    return authResult;
+  // Get the token
+  const token = await getToken({ req });
+
+  // Auth check
+  if (!token) {
+    return NextResponse.redirect(new URL('/auth/signin', req.url));
   }
 
-  // Get token for subsequent middleware
-  const token = await getToken({ 
-    req: request,
-    secret: process.env.NEXTAUTH_SECRET
-  });
+  // Role-based access control
+  const { role } = token;
 
-  // Run role-based access control
-  const roleResult = await rolesMiddleware(request, token);
-  if (roleResult instanceof NextResponse) {
-    return roleResult;
+  // Admin routes
+  if (pathname.startsWith('/dashboard/admin') && role !== 'admin') {
+    return NextResponse.redirect(new URL('/', req.url));
   }
 
-  // Run shop verification
-  const shopResult = await shopMiddleware(request, token);
-  if (shopResult instanceof NextResponse) {
-    return shopResult;
+  // Seller routes
+  if (pathname.startsWith('/dashboard/seller')) {
+    if (role !== 'seller') {
+      return NextResponse.redirect(new URL('/', req.url));
+    }
+
+    // Check if seller has a shop
+    if (!pathname.startsWith('/dashboard/seller/create-shop')) {
+      try {
+        const shopResponse = await fetch(`${req.nextUrl.origin}/api/shop`, {
+          headers: {
+            cookie: req.headers.get('cookie') || '',
+          },
+        });
+
+        const shop = await shopResponse.json();
+
+        if (!shop) {
+          return NextResponse.redirect(new URL('/dashboard/seller/create-shop', req.url));
+        }
+      } catch (error) {
+        console.error('Error checking shop status:', error);
+      }
+    }
   }
 
   return NextResponse.next();
@@ -60,7 +61,6 @@ export async function middleware(request) {
 // Configure which paths the middleware should run on
 export const config = {
   matcher: [
-    '/api/:path*',
     '/dashboard/:path*',
     '/cart/:path*',
     '/wishlist/:path*',

@@ -1,18 +1,25 @@
 'use client';
 
-import { useState, useEffect } from 'react';
+import { useEffect } from 'react';
 import { useSession } from 'next-auth/react';
 import { useRouter } from 'next/navigation';
 import Image from 'next/image';
 import { FaTrash, FaMinus, FaPlus } from 'react-icons/fa';
 import LoadingSpinner from '@/components/ui/LoadingSpinner';
 import Button from '@/components/ui/Button';
+import { useCart } from '@/contexts/CartContext';
 
 export default function Cart() {
   const { data: session } = useSession();
   const router = useRouter();
-  const [loading, setLoading] = useState(true);
-  const [cart, setCart] = useState(null);
+  const { 
+    cart, 
+    loading, 
+    error, 
+    updateQuantity, 
+    removeItem, 
+    getCartTotal 
+  } = useCart();
 
   useEffect(() => {
     if (!session) {
@@ -24,73 +31,33 @@ export default function Cart() {
       router.push('/dashboard/seller');
       return;
     }
-
-    fetchCart();
   }, [session, router]);
 
-  const fetchCart = async () => {
-    try {
-      const response = await fetch('/api/cart');
-      if (response.ok) {
-        const data = await response.json();
-        setCart(data);
-      }
-    } catch (error) {
-      console.error('Error fetching cart:', error);
-    } finally {
-      setLoading(false);
-    }
+  const handleQuantityChange = async (productId, newQuantity) => {
+    if (newQuantity < 1) return;
+    await updateQuantity(productId, newQuantity);
   };
 
-  const updateQuantity = async (productId, quantity) => {
-    try {
-      const response = await fetch('/api/cart', {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-        },
-        body: JSON.stringify({ productId, quantity }),
-      });
-
-      if (response.ok) {
-        const data = await response.json();
-        setCart(data);
-      }
-    } catch (error) {
-      console.error('Error updating cart:', error);
-    }
-  };
-
-  const removeItem = async (productId) => {
-    try {
-      const response = await fetch('/api/cart', {
-        method: 'DELETE',
-        headers: {
-          'Content-Type': 'application/json',
-        },
-        body: JSON.stringify({ productId }),
-      });
-
-      if (response.ok) {
-        const data = await response.json();
-        setCart(data);
-      }
-    } catch (error) {
-      console.error('Error removing item:', error);
-    }
-  };
-
-  const calculateTotal = () => {
-    if (!cart?.items?.length) return 0;
-    return cart.items.reduce((total, item) => {
-      return total + (item.product.price * item.quantity);
-    }, 0);
+  const handleRemoveItem = async (productId) => {
+    await removeItem(productId);
   };
 
   if (loading) {
     return (
       <div className="min-h-screen flex items-center justify-center">
         <LoadingSpinner size="lg" />
+      </div>
+    );
+  }
+
+  if (error) {
+    return (
+      <div className="min-h-screen bg-gray-50 py-8">
+        <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
+          <div className="bg-red-100 border border-red-400 text-red-700 px-4 py-3 rounded">
+            {error}
+          </div>
+        </div>
       </div>
     );
   }
@@ -111,102 +78,87 @@ export default function Cart() {
             </Button>
           </div>
         ) : (
-          <div className="bg-white rounded-lg shadow-md overflow-hidden">
-            <table className="min-w-full divide-y divide-gray-200">
-              <thead className="bg-gray-50">
-                <tr>
-                  <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                    Product
-                  </th>
-                  <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                    Price
-                  </th>
-                  <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                    Quantity
-                  </th>
-                  <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                    Total
-                  </th>
-                  <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                    Actions
-                  </th>
-                </tr>
-              </thead>
-              <tbody className="bg-white divide-y divide-gray-200">
-                {cart.items.map((item) => (
-                  <tr key={item.product._id}>
-                    <td className="px-6 py-4 whitespace-nowrap">
-                      <div className="flex items-center">
-                        <div className="h-16 w-16 relative flex-shrink-0">
-                          <Image
-                            src={item.product.imageUrl}
-                            alt={item.product.name}
-                            fill
-                            className="object-cover rounded-md"
-                          />
-                        </div>
-                        <div className="ml-4">
-                          <div className="text-sm font-medium text-gray-900">
-                            {item.product.name}
+          <div className="grid grid-cols-1 lg:grid-cols-3 gap-8">
+            <div className="lg:col-span-2">
+              <div className="bg-white rounded-lg shadow-md overflow-hidden">
+                <div className="divide-y divide-gray-200">
+                  {cart.items.map((item) => (
+                    <div key={item.product._id} className="p-6 flex items-center">
+                      <div className="relative h-24 w-24 flex-shrink-0">
+                        <Image
+                          src={item.product.media.mainImage}
+                          alt={item.product.name}
+                          fill
+                          className="object-cover rounded-md"
+                        />
+                      </div>
+                      <div className="ml-6 flex-1">
+                        <h3 className="text-lg font-medium text-gray-900">
+                          {item.product.name}
+                        </h3>
+                        <p className="mt-1 text-sm text-gray-500">
+                          {item.product.shop.name}
+                        </p>
+                        <div className="mt-2 flex items-center justify-between">
+                          <div className="flex items-center">
+                            <button
+                              onClick={() => handleQuantityChange(item.product._id, item.quantity - 1)}
+                              className="p-1 rounded-full hover:bg-gray-100"
+                            >
+                              <FaMinus className="h-4 w-4 text-gray-500" />
+                            </button>
+                            <span className="mx-2 text-gray-700">{item.quantity}</span>
+                            <button
+                              onClick={() => handleQuantityChange(item.product._id, item.quantity + 1)}
+                              className="p-1 rounded-full hover:bg-gray-100"
+                            >
+                              <FaPlus className="h-4 w-4 text-gray-500" />
+                            </button>
+                          </div>
+                          <div className="flex items-center">
+                            <p className="text-lg font-medium text-gray-900">
+                              Nu. {(item.product.pricing.base * item.quantity).toFixed(2)}
+                            </p>
+                            <button
+                              onClick={() => handleRemoveItem(item.product._id)}
+                              className="ml-4 text-red-500 hover:text-red-700"
+                            >
+                              <FaTrash />
+                            </button>
                           </div>
                         </div>
                       </div>
-                    </td>
-                    <td className="px-6 py-4 whitespace-nowrap">
-                      <div className="text-sm text-gray-900">Nu. {item.product.price}</div>
-                    </td>
-                    <td className="px-6 py-4 whitespace-nowrap">
-                      <div className="flex items-center space-x-2">
-                        <button
-                          onClick={() => updateQuantity(item.product._id, Math.max(1, item.quantity - 1))}
-                          className="p-1 rounded-md hover:bg-gray-100"
-                        >
-                          <FaMinus className="text-gray-500" />
-                        </button>
-                        <span className="text-sm text-gray-900">{item.quantity}</span>
-                        <button
-                          onClick={() => updateQuantity(item.product._id, item.quantity + 1)}
-                          className="p-1 rounded-md hover:bg-gray-100"
-                        >
-                          <FaPlus className="text-gray-500" />
-                        </button>
-                      </div>
-                    </td>
-                    <td className="px-6 py-4 whitespace-nowrap">
-                      <div className="text-sm text-gray-900">
-                        Nu. {item.product.price * item.quantity}
-                      </div>
-                    </td>
-                    <td className="px-6 py-4 whitespace-nowrap">
-                      <button
-                        onClick={() => removeItem(item.product._id)}
-                        className="text-red-600 hover:text-red-900"
-                      >
-                        <FaTrash />
-                      </button>
-                    </td>
-                  </tr>
-                ))}
-              </tbody>
-            </table>
-
-            <div className="px-6 py-4 bg-gray-50">
-              <div className="flex justify-between items-center">
-                <div className="text-lg font-semibold text-gray-900">
-                  Total: Nu. {calculateTotal()}
+                    </div>
+                  ))}
                 </div>
-                <div className="space-x-4">
-                  <Button
-                    variant="secondary"
-                    onClick={() => router.push('/')}
-                  >
-                    Continue Shopping
-                  </Button>
+              </div>
+            </div>
+            <div className="lg:col-span-1">
+              <div className="bg-white rounded-lg shadow-md p-6">
+                <h2 className="text-lg font-medium text-gray-900 mb-4">Order Summary</h2>
+                <div className="space-y-4">
+                  <div className="flex justify-between">
+                    <span className="text-gray-600">Subtotal</span>
+                    <span className="text-gray-900">Nu. {getCartTotal().toFixed(2)}</span>
+                  </div>
+                  <div className="flex justify-between">
+                    <span className="text-gray-600">Shipping</span>
+                    <span className="text-gray-900">Free</span>
+                  </div>
+                  <div className="border-t pt-4">
+                    <div className="flex justify-between">
+                      <span className="text-lg font-medium text-gray-900">Total</span>
+                      <span className="text-lg font-medium text-gray-900">
+                        Nu. {getCartTotal().toFixed(2)}
+                      </span>
+                    </div>
+                  </div>
                   <Button
                     variant="primary"
+                    className="w-full"
                     onClick={() => router.push('/checkout')}
                   >
-                    Checkout
+                    Proceed to Checkout
                   </Button>
                 </div>
               </div>

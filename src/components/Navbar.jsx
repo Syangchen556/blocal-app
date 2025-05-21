@@ -5,7 +5,7 @@ import { useSession } from 'next-auth/react';
 import Link from 'next/link';
 import Image from 'next/image';
 import { signOut } from 'next-auth/react';
-import { FaHome, FaQuestionCircle, FaBlog, FaShoppingCart, FaHeart, FaSignOutAlt, FaStore, FaUser, FaChartLine, FaHistory, FaCog, FaBox } from 'react-icons/fa';
+import { FaHome, FaQuestionCircle, FaBlog, FaShoppingCart, FaHeart, FaSignOutAlt, FaStore, FaUser, FaChartLine, FaHistory, FaCog, FaBox, FaClipboardList, FaTruck, FaChartBar } from 'react-icons/fa';
 
 export default function Navbar() {
   const { data: session } = useSession();
@@ -45,11 +45,44 @@ export default function Navbar() {
     await signOut({ callbackUrl: '/' });
   };
 
+  const handleLinkClick = () => {
+    setIsProfileOpen(false);
+  };
+
   if (!session) {
     return null;
   }
 
-  const isSeller = session.user.role === 'SELLER';
+  const getNavItems = () => {
+    const role = session.user.role;
+
+    switch (role) {
+      case 'SELLER':
+        return [
+          { href: '/', label: 'Home', icon: FaStore },
+          { href: '/help', label: 'Help', icon: FaClipboardList },
+          { href: '/blog', label: 'Blog', icon: FaBlog },
+          { href: '/dashboard/seller/profile', label: 'Shop Profile', icon: FaStore },
+          { href: '/dashboard/seller/products', label: 'Products', icon: FaBox },
+        ];
+      case 'BUYER':
+        return [
+          { href: '/', label: 'Home', icon: FaStore },
+          { href: '/help', label: 'Help', icon: FaClipboardList },
+          { href: '/blog', label: 'Blog', icon: FaBlog },
+          { href: '/dashboard/buyer/wishlist', label: 'Wishlist', icon: FaHeart },
+          { href: '/dashboard/buyer/profile', label: 'Profile', icon: FaUser },
+        ];
+      default:
+        return [
+          { href: '/', label: 'Home', icon: FaStore },
+          { href: '/help', label: 'Help', icon: FaClipboardList },
+          { href: '/blog', label: 'Blog', icon: FaBlog },
+        ];
+    }
+  };
+
+  const navItems = getNavItems();
 
   return (
     <nav className="bg-white shadow-md sticky top-0 z-50">
@@ -63,22 +96,20 @@ export default function Navbar() {
           </div>
 
           <div className="flex items-center space-x-4">
-            <Link href="/" className="nav-link">
-              <FaHome className="h-5 w-5" />
-              <span>Home</span>
-            </Link>
+            <div className="hidden md:flex items-center space-x-4">
+              {navItems.map((item) => (
+                <Link
+                  key={item.href}
+                  href={item.href}
+                  className="text-gray-600 hover:text-gray-900 px-3 py-2 rounded-md text-sm font-medium flex items-center"
+                >
+                  <item.icon className="h-5 w-5 mr-1" />
+                  <span>{item.label}</span>
+                </Link>
+              ))}
+            </div>
 
-            <Link href="/help" className="nav-link">
-              <FaQuestionCircle className="h-5 w-5" />
-              <span>Help</span>
-            </Link>
-
-            <Link href="/blog" className="nav-link">
-              <FaBlog className="h-5 w-5" />
-              <span>Blog</span>
-            </Link>
-
-            {!isSeller && (
+            {!session.user.role === 'SELLER' && (
               <>
                 <Link href="/cart" className="nav-link relative">
                   <FaShoppingCart className="h-5 w-5" />
@@ -101,61 +132,68 @@ export default function Navbar() {
             <div className="relative" ref={dropdownRef}>
               <button
                 onClick={() => setIsProfileOpen(!isProfileOpen)}
-                className="flex items-center space-x-2 p-2 rounded-full hover:bg-gray-100 focus:outline-none"
+                className="flex items-center space-x-2 text-gray-600 hover:text-gray-900"
               >
-                <div className="relative w-8 h-8 rounded-full overflow-hidden">
-                  <Image
-                    src={session.user.image || '/images/default-avatar.png'}
-                    alt={session.user.name}
-                    fill
-                    className="object-cover"
-                  />
-                </div>
+                <Image
+                  src={session.user.image || '/images/default-avatar.png'}
+                  alt={session.user.name}
+                  width={32}
+                  height={32}
+                  className="rounded-full"
+                />
+                <span className="hidden md:block">{session.user.name}</span>
               </button>
 
               {isProfileOpen && (
-                <div className="absolute right-0 mt-2 w-48 bg-white rounded-md shadow-lg py-1 z-50">
-                  <div className="px-4 py-2 border-b">
-                    <p className="text-sm font-medium text-gray-900">{session.user.name}</p>
-                    <p className="text-sm text-gray-500">{session.user.email}</p>
-                  </div>
-
-                  {isSeller ? (
-                    // Seller menu items
+                <div className="absolute right-0 mt-2 w-48 bg-white rounded-md shadow-lg py-1 z-10">
+                  {session.user.role === 'SELLER' ? (
                     <>
-                      <Link href="/dashboard/seller" className="dropdown-item">
+                      <Link href="/dashboard/seller" className="dropdown-item" onClick={handleLinkClick}>
                         <FaStore className="w-4 h-4" />
                         <span>Shop Dashboard</span>
                       </Link>
-                      <Link href="/dashboard/seller/products" className="dropdown-item">
+                      <Link href="/dashboard/seller/products" className="dropdown-item" onClick={handleLinkClick}>
                         <FaBox className="w-4 h-4" />
                         <span>Products</span>
                       </Link>
-                      <Link href="/dashboard/seller/sales" className="dropdown-item">
+                      <Link href="/dashboard/seller/sales" className="dropdown-item" onClick={handleLinkClick}>
                         <FaChartLine className="w-4 h-4" />
                         <span>Sales Analytics</span>
                       </Link>
                     </>
                   ) : (
-                    // Buyer menu items
                     <>
-                      <Link href="/dashboard/buyer" className="dropdown-item">
+                      <Link href="/profile" className="dropdown-item" onClick={handleLinkClick}>
                         <FaUser className="w-4 h-4" />
                         <span>My Profile</span>
                       </Link>
-                      <Link href="/dashboard/buyer/orders" className="dropdown-item">
-                        <FaHistory className="w-4 h-4" />
-                        <span>Order History</span>
+                      <Link href="/profile?tab=orders" className="dropdown-item" onClick={handleLinkClick}>
+                        <FaClipboardList className="w-4 h-4" />
+                        <span>Purchase History</span>
+                      </Link>
+                      <Link href="/profile?tab=tracking" className="dropdown-item" onClick={handleLinkClick}>
+                        <FaTruck className="w-4 h-4" />
+                        <span>Order Tracking</span>
+                      </Link>
+                      <Link href="/profile?tab=stats" className="dropdown-item" onClick={handleLinkClick}>
+                        <FaChartBar className="w-4 h-4" />
+                        <span>Statistics</span>
                       </Link>
                     </>
                   )}
 
-                  <Link href="/settings" className="dropdown-item">
+                  <Link href="/settings" className="dropdown-item" onClick={handleLinkClick}>
                     <FaCog className="w-4 h-4" />
                     <span>Settings</span>
                   </Link>
 
-                  <button onClick={handleLogout} className="dropdown-item text-red-600 hover:text-red-900">
+                  <button 
+                    onClick={() => {
+                      handleLogout();
+                      handleLinkClick();
+                    }} 
+                    className="dropdown-item text-red-600 hover:text-red-900"
+                  >
                     <FaSignOutAlt className="w-4 h-4" />
                     <span>Logout</span>
                   </button>

@@ -7,6 +7,7 @@ import Image from 'next/image';
 import Link from 'next/link';
 import { toast } from 'react-hot-toast';
 import LoadingSpinner from '@/components/ui/LoadingSpinner';
+import { FaSearch, FaCheck, FaTimes, FaStore, FaChartLine } from 'react-icons/fa';
 
 export default function AdminShopsPage() {
   const [shops, setShops] = useState([]);
@@ -14,6 +15,13 @@ export default function AdminShopsPage() {
   const [error, setError] = useState(null);
   const { data: session, status } = useSession();
   const router = useRouter();
+  const [searchQuery, setSearchQuery] = useState('');
+  const [stats, setStats] = useState({
+    total: 0,
+    pending: 0,
+    approved: 0,
+    rejected: 0
+  });
 
   useEffect(() => {
     if (status === 'loading') return;
@@ -38,6 +46,15 @@ export default function AdminShopsPage() {
         throw new Error('Invalid data format received');
       }
       setShops(data);
+      
+      // Calculate statistics
+      const stats = {
+        total: data.length,
+        pending: data.filter(shop => shop.status === 'pending').length,
+        approved: data.filter(shop => shop.status === 'active').length,
+        rejected: data.filter(shop => shop.status === 'rejected').length
+      };
+      setStats(stats);
     } catch (err) {
       setError(err.message);
       toast.error(err.message);
@@ -87,6 +104,11 @@ export default function AdminShopsPage() {
     }
   };
 
+  const filteredShops = shops.filter(shop =>
+    shop.name.toLowerCase().includes(searchQuery.toLowerCase()) ||
+    shop.ownerName.toLowerCase().includes(searchQuery.toLowerCase())
+  );
+
   if (status === 'loading' || loading) {
     return (
       <div className="min-h-screen p-4">
@@ -114,92 +136,71 @@ export default function AdminShopsPage() {
         <p className="text-gray-600">Manage all shops in the system</p>
       </div>
 
-      {/* Pending Shops Section */}
-      {shops.some(shop => shop.status === 'pending') && (
-        <div className="mb-8">
-          <h2 className="text-xl font-semibold text-gray-800 mb-4">Pending Approvals</h2>
-          <div className="bg-white rounded-lg shadow overflow-hidden">
-            <div className="overflow-x-auto">
-              <table className="min-w-full divide-y divide-gray-200">
-                <thead className="bg-yellow-50">
-                  <tr>
-                    <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                      Shop
-                    </th>
-                    <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                      Owner
-                    </th>
-                    <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                      Submitted
-                    </th>
-                    <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                      Actions
-                    </th>
-                  </tr>
-                </thead>
-                <tbody className="bg-white divide-y divide-gray-200">
-                  {shops.filter(shop => shop.status === 'pending').map((shop) => (
-                    <tr key={shop._id}>
-                      <td className="px-6 py-4 whitespace-nowrap">
-                        <div className="flex items-center">
-                          {shop.logo ? (
-                            <div className="flex-shrink-0 h-10 w-10 relative">
-                              <Image
-                                src={shop.logo}
-                                alt={shop.name}
-                                fill
-                                className="rounded-full object-cover"
-                              />
-                            </div>
-                          ) : (
-                            <div className="flex-shrink-0 h-10 w-10 rounded-full bg-gray-200 flex items-center justify-center">
-                              <span className="text-gray-500 text-sm">
-                                {shop.name.charAt(0)}
-                              </span>
-                            </div>
-                          )}
-                          <div className="ml-4">
-                            <div className="text-sm font-medium text-gray-900">
-                              {shop.name}
-                            </div>
-                            <div className="text-sm text-gray-500">
-                              {shop.description}
-                            </div>
-                          </div>
-                        </div>
-                      </td>
-                      <td className="px-6 py-4 whitespace-nowrap">
-                        <div className="text-sm text-gray-900">{shop.ownerName}</div>
-                        <div className="text-sm text-gray-500">{shop.ownerEmail}</div>
-                      </td>
-                      <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500">
-                        {new Date(shop.createdAt).toLocaleDateString()}
-                      </td>
-                      <td className="px-6 py-4 whitespace-nowrap text-sm font-medium">
-                        <button
-                          onClick={() => handleStatusUpdate(shop._id, 'active', 'Shop approved by admin')}
-                          className="text-green-600 hover:text-green-900 mr-4"
-                        >
-                          Approve
-                        </button>
-                        <button
-                          onClick={() => handleStatusUpdate(shop._id, 'rejected', 'Shop rejected by admin')}
-                          className="text-red-600 hover:text-red-900"
-                        >
-                          Reject
-                        </button>
-                      </td>
-                    </tr>
-                  ))}
-                </tbody>
-              </table>
+      {/* Statistics Cards */}
+      <div className="grid grid-cols-1 md:grid-cols-4 gap-6 mb-8">
+        <div className="bg-white rounded-lg shadow p-6">
+          <div className="flex items-center">
+            <div className="p-3 bg-blue-100 rounded-full">
+              <FaStore className="h-6 w-6 text-blue-600" />
+            </div>
+            <div className="ml-4">
+              <h2 className="text-sm font-medium text-gray-500">Total Shops</h2>
+              <p className="text-2xl font-semibold text-gray-900">{stats.total}</p>
             </div>
           </div>
         </div>
-      )}
 
-      {/* All Shops Section */}
-      <div className="bg-white rounded-lg shadow overflow-hidden">
+        <div className="bg-white rounded-lg shadow p-6">
+          <div className="flex items-center">
+            <div className="p-3 bg-yellow-100 rounded-full">
+              <FaChartLine className="h-6 w-6 text-yellow-600" />
+            </div>
+            <div className="ml-4">
+              <h2 className="text-sm font-medium text-gray-500">Pending Approval</h2>
+              <p className="text-2xl font-semibold text-gray-900">{stats.pending}</p>
+            </div>
+          </div>
+        </div>
+
+        <div className="bg-white rounded-lg shadow p-6">
+          <div className="flex items-center">
+            <div className="p-3 bg-green-100 rounded-full">
+              <FaCheck className="h-6 w-6 text-green-600" />
+            </div>
+            <div className="ml-4">
+              <h2 className="text-sm font-medium text-gray-500">Approved</h2>
+              <p className="text-2xl font-semibold text-gray-900">{stats.approved}</p>
+            </div>
+          </div>
+        </div>
+
+        <div className="bg-white rounded-lg shadow p-6">
+          <div className="flex items-center">
+            <div className="p-3 bg-red-100 rounded-full">
+              <FaTimes className="h-6 w-6 text-red-600" />
+            </div>
+            <div className="ml-4">
+              <h2 className="text-sm font-medium text-gray-500">Rejected</h2>
+              <p className="text-2xl font-semibold text-gray-900">{stats.rejected}</p>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      {/* Search Bar */}
+      <div className="relative">
+        <FaSearch className="absolute left-3 top-1/2 transform -translate-y-1/2 text-gray-400" />
+        <input
+          type="text"
+          placeholder="Search shops..."
+          value={searchQuery}
+          onChange={(e) => setSearchQuery(e.target.value)}
+          className="w-full pl-10 pr-4 py-2 rounded-lg border border-gray-300 focus:ring-2 focus:ring-green-500 focus:border-transparent"
+        />
+      </div>
+
+      {/* Shops Table */}
+      <div className="bg-white rounded-lg shadow overflow-hidden mt-8">
         <div className="overflow-x-auto">
           <table className="min-w-full divide-y divide-gray-200">
             <thead className="bg-gray-50">
@@ -225,7 +226,7 @@ export default function AdminShopsPage() {
               </tr>
             </thead>
             <tbody className="bg-white divide-y divide-gray-200">
-              {shops.filter(shop => shop.status !== 'pending').map((shop) => (
+              {filteredShops.map((shop) => (
                 <tr key={shop._id}>
                   <td className="px-6 py-4 whitespace-nowrap">
                     <div className="flex items-center">
@@ -250,7 +251,7 @@ export default function AdminShopsPage() {
                           {shop.name}
                         </div>
                         <div className="text-sm text-gray-500">
-                          Created {new Date(shop.createdAt).toLocaleDateString()}
+                          {shop.description}
                         </div>
                       </div>
                     </div>

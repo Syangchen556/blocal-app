@@ -1,5 +1,6 @@
 import { NextResponse } from 'next/server';
-import { getServerSession } from 'next-auth';
+import { getServerSession } from 'next-auth/next';
+import { authOptions } from '@/lib/auth';
 import connectDB from '@/lib/mongodb';
 import Post from '@/models/Post';
 import Comment from '@/models/Comment';
@@ -8,7 +9,7 @@ import User from '@/models/User';
 // POST /api/posts/[postId]/comments - Create a new comment
 export async function POST(request, { params }) {
   try {
-    const session = await getServerSession();
+    const session = await getServerSession(authOptions);
     if (!session) {
       return NextResponse.json(
         { error: 'Unauthorized' },
